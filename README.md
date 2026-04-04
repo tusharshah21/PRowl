@@ -1,6 +1,8 @@
-# AI Code Reviewer
+# PRowl
 
-Open-source AI code review for GitHub PRs. Works with **any LLM provider**.
+**The multi-agent PR reviewer that never misses a bug.**
+
+Open-source, self-hostable GitHub Action. Works with **any LLM provider**.
 
 ## How It Works
 
