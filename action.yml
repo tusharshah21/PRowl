@@ -1,0 +1,35 @@
+name: "AI Code Review Action"
+description: "Perform code reviews using any LLM provider (OpenAI, Anthropic, Google, etc.) with TOON encoding for token efficiency."
+inputs:
+  GITHUB_TOKEN:
+    description: "GitHub token to interact with the repository."
+    required: true
+  LLM_API_KEY:
+    description: "API key for your chosen LLM provider (OpenAI, Anthropic, Google, etc.). Bring Your Own Key (BYOK)."
+    required: true
+  LLM_MODEL:
+    description: "Model name (e.g., gpt-4o, claude-3-5-sonnet-20241022, gemini/gemini-pro, azure/gpt-4)."
+    required: false
+    default: "gpt-4o"
+  LLM_BASE_URL:
+    description: "Optional: Custom LiteLLM proxy endpoint URL. Leave empty for direct provider calls."
+    required: false
+    default: ""
+  LLM_REVIEWER_MODEL:
+    description: "Fast/cheap model for issue detection (falls back to LLM_MODEL if not set)."
+    required: false
+    default: ""
+  LLM_FIXER_MODEL:
+    description: "Smarter model for explanation and fix generation (falls back to LLM_MODEL if not set)."
+    required: false
+    default: ""
+  exclude:
+    description: "Glob patterns to exclude files from the diff analysis"
+    required: false
+    default: ""
+runs:
+  using: "node20"
+  main: "dist/index.js"
+branding:
+  icon: "aperture"
+  color: "green"
