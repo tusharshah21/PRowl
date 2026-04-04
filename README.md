@@ -4,7 +4,28 @@ Open-source AI code review for GitHub PRs. Works with **any LLM provider**.
 
 ## Architecture Overview
 
-![AI Code Reviewer Architecture](<architecture.png>)
+```mermaid
+flowchart TD
+    subgraph GitHub["GitHub CI/CD"]
+        PR([Pull Request Opened / Updated])
+        GH[GitHub API\nFetch PR Diff]
+        CM[Post Inline Review\nComments with Fix Suggestions]
+    end
+
+    subgraph Action["AI Code Reviewer Action"]
+        TOON[TOON Encoder\nCompact token-efficient diff]
+
+        subgraph Orchestrator["Orchestrator Pipeline"]
+            A1["Agent 1 — Reviewer\n🔍 cheap / fast model\nDetects BUG · SECURITY\nPERF · BEST_PRACTICE"]
+            CHK{Issues found?}
+            A2["Agent 2 — Explainer + Fixer\n🧠 smarter model\nExplanation + fixed code\nper issue · runs in parallel"]
+        end
+    end
+
+    PR --> GH --> TOON --> A1 --> CHK
+    CHK -- No issues --> DONE([Done — zero fixer cost])
+    CHK -- Issues found --> A2 --> CM
+```
 
 ## Features
 

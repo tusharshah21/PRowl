@@ -18,9 +18,10 @@ jobs:
         uses: actions/checkout@v3
 
       - name: AI Code Review
-        uses: tusharshah21/ai-code-reviewer@main
+        uses: tusharshah21/PRowl@main
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL: "gpt-4o"
+          LLM_REVIEWER_MODEL: "gpt-4o-mini"
+          LLM_FIXER_MODEL: "gpt-4o"
           exclude: "pnpm-lock.yaml,dist/**"
