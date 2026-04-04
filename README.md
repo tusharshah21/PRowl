@@ -2,7 +2,7 @@
 
 Open-source AI code review for GitHub PRs. Works with **any LLM provider**.
 
-## Architecture Overview
+## How It Works
 
 ```mermaid
 flowchart TD
@@ -26,6 +26,14 @@ flowchart TD
     CHK -- No issues --> DONE([Done — zero fixer cost])
     CHK -- Issues found --> A2 --> CM
 ```
+
+1. Triggers on PR open/update
+2. Fetches code diff from GitHub
+3. Encodes all changed chunks into token-efficient TOON format
+4. **Agent 1 (Reviewer)** — sends the full TOON diff to a cheap/fast model; detects `BUG`, `SECURITY`, `PERFORMANCE`, `BEST_PRACTICE` issues and returns a typed list
+5. If no issues are found → pipeline stops; **Agent 2 is never called** (zero extra cost)
+6. **Agent 2 (Explainer+Fixer)** — for each flagged chunk (not the full diff), generates an explanation and corrected code in a single LLM call; all issues are processed in parallel
+7. Posts inline PR comments with: issue type label, concise explanation, and a GitHub suggestion block with the fixed code
 
 ## Features
 
@@ -170,27 +178,6 @@ LLM_BASE_URL: "https://openrouter.ai/api/v1"
 | `exclude` | No | - | Files to skip (glob patterns) |
 
 ---
-
-## How It Works
-
-```mermaid
-flowchart TD
-    A([PR Opened / Updated]) --> B[Fetch Diff from GitHub]
-    B --> C[TOON Encode all chunks]
-    C --> D[Agent 1: Reviewer\nfast / cheap model]
-    D --> E{Issues found?}
-    E -- No --> F([Done — zero fixer cost])
-    E -- Yes --> G[Agent 2: Explainer + Fixer\nsmarter model\nparallel per issue]
-    G --> H[Post inline PR comments\nwith explanation + fix suggestion]
-```
-
-1. Triggers on PR open/update
-2. Fetches code diff from GitHub
-3. Encodes all changed chunks into token-efficient TOON format
-4. **Agent 1 (Reviewer)** — sends the full TOON diff to a cheap/fast model; detects `BUG`, `SECURITY`, `PERFORMANCE`, `BEST_PRACTICE` issues and returns a typed list
-5. If no issues are found → pipeline stops; **Agent 2 is never called** (zero extra cost)
-6. **Agent 2 (Explainer+Fixer)** — for each flagged chunk (not the full diff), generates an explanation and corrected code in a single LLM call; all issues are processed in parallel
-7. Posts inline PR comments with: issue type label, concise explanation, and a GitHub suggestion block with the fixed code
 
 ---
 
