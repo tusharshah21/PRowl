@@ -136,13 +136,14 @@ const core = __importStar(__nccwpck_require__(1078));
 const rest_1 = __nccwpck_require__(6326);
 const parse_diff_1 = __importDefault(__nccwpck_require__(2347));
 const minimatch_1 = __importDefault(__nccwpck_require__(2868));
-const litellm_1 = __nccwpck_require__(4132);
 const encoder_1 = __nccwpck_require__(1990);
-const parser_1 = __nccwpck_require__(4905);
+const orchestrator_1 = __nccwpck_require__(6709);
 const GITHUB_TOKEN = core.getInput("GITHUB_TOKEN");
 const LLM_API_KEY = core.getInput("LLM_API_KEY");
 const LLM_MODEL = core.getInput("LLM_MODEL");
 const LLM_BASE_URL = core.getInput("LLM_BASE_URL");
+const LLM_REVIEWER_MODEL = core.getInput("LLM_REVIEWER_MODEL") || LLM_MODEL;
+const LLM_FIXER_MODEL = core.getInput("LLM_FIXER_MODEL") || LLM_MODEL;
 const octokit = new rest_1.Octokit({ auth: GITHUB_TOKEN });
 function getPRDetails() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -177,46 +178,34 @@ function getDiff(owner, repo, pull_number) {
 function analyzeCode(parsedDiff, prDetails) {
     return __awaiter(this, void 0, void 0, function* () {
         const comments = [];
+        // Build full TOON-encoded diff string for the orchestrator
+        const toonChunks = [];
         for (const file of parsedDiff) {
             if (file.to === "/dev/null")
-                continue; // Ignore deleted files
+                continue;
             for (const chunk of file.chunks) {
-                const prompt = (0, encoder_1.createTOONPrompt)(file, chunk, prDetails.title, prDetails.description);
-                const aiResponse = yield getAIResponse(prompt);
-                if (aiResponse) {
-                    const reviews = (0, parser_1.parseTOONReview)(aiResponse);
-                    if (reviews.length > 0 && file.to) {
-                        const newComments = (0, parser_1.convertToGitHubComments)(reviews, file.to);
-                        comments.push(...newComments);
-                    }
-                }
+                toonChunks.push((0, encoder_1.encodeDiffToTOON)(file, chunk));
             }
         }
+        if (toonChunks.length === 0)
+            return comments;
+        const toonDiff = toonChunks.join("\n");
+        const config = {
+            reviewerModel: LLM_REVIEWER_MODEL,
+            fixerModel: LLM_FIXER_MODEL,
+            apiKey: LLM_API_KEY,
+            baseURL: LLM_BASE_URL || undefined,
+        };
+        const results = yield (0, orchestrator_1.orchestrate)(toonDiff, config);
+        for (const result of results) {
+            const body = `**[${result.issueType}]** ${result.explanation}\n\n\`\`\`suggestion\n${result.fixedCode}\n\`\`\``;
+            comments.push({
+                body,
+                path: result.file,
+                line: result.lineNumber,
+            });
+        }
         return comments;
-    });
-}
-function getAIResponse(prompt) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            console.log(`Using model: ${LLM_MODEL}`);
-            const response = yield (0, litellm_1.callLiteLLM)({
-                model: LLM_MODEL,
-                apiKey: LLM_API_KEY,
-                baseURL: LLM_BASE_URL || undefined,
-                temperature: 0.2,
-                maxTokens: 700,
-            }, [
-                {
-                    role: "system",
-                    content: prompt,
-                },
-            ]);
-            return response;
-        }
-        catch (error) {
-            console.error("Error calling LLM:", error);
-            return null;
-        }
     });
 }
 function createReviewComment(owner, repo, pull_number, comments) {
@@ -279,6 +268,208 @@ main().catch((error) => {
     console.error("Error:", error);
     process.exit(1);
 });
+
+
+/***/ }),
+
+/***/ 5152:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.runExplainerFixAgent = runExplainerFixAgent;
+const litellm_1 = __nccwpck_require__(4132);
+function buildPrompt(issueType) {
+    return `You are a senior engineer. You receive a code chunk flagged as a ${issueType} issue.
+
+Your job:
+1. Explain the problem concisely (1-3 sentences)
+2. Provide the corrected code
+
+OUTPUT (strict JSON, nothing else):
+{"explanation":"<what's wrong and why>","fixedCode":"<corrected code snippet>","lineNumber":<original line number>}`;
+}
+function cleanJSON(raw) {
+    let cleaned = raw.trim();
+    if (cleaned.startsWith("```json")) {
+        cleaned = cleaned.replace(/^```json\s*/, "").replace(/```\s*$/, "");
+    }
+    else if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```\s*/, "").replace(/```\s*$/, "");
+    }
+    return cleaned;
+}
+function runExplainerFixAgent(chunk, issueType, lineNumber, config) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const response = yield (0, litellm_1.callLLM)(config, [
+            { role: "system", content: buildPrompt(issueType) },
+            { role: "user", content: `Line ${lineNumber}:\n${chunk}` },
+        ]);
+        if (!response) {
+            console.warn("Explainer/fix agent returned no response");
+            return null;
+        }
+        try {
+            const parsed = JSON.parse(cleanJSON(response));
+            if (typeof parsed.explanation !== "string" ||
+                typeof parsed.fixedCode !== "string" ||
+                typeof parsed.lineNumber !== "number") {
+                console.warn("Invalid explainer/fix response structure");
+                return null;
+            }
+            return parsed;
+        }
+        catch (error) {
+            console.warn("Failed to parse explainer/fix response:", error);
+            console.warn("Raw response:", response);
+            return null;
+        }
+    });
+}
+
+
+/***/ }),
+
+/***/ 6709:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.orchestrate = orchestrate;
+const reviewerAgent_1 = __nccwpck_require__(864);
+const explainerFixAgent_1 = __nccwpck_require__(5152);
+function orchestrate(toonDiff, config) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const reviewerConfig = {
+            model: config.reviewerModel,
+            apiKey: config.apiKey,
+            baseURL: config.baseURL,
+            temperature: 0.2,
+            maxTokens: 700,
+        };
+        console.log(`[orchestrator] Running reviewer agent with model: ${config.reviewerModel}`);
+        const issues = yield (0, reviewerAgent_1.runReviewerAgent)(toonDiff, reviewerConfig);
+        if (issues.length === 0) {
+            console.log("[orchestrator] No issues detected — skipping fixer agent");
+            return [];
+        }
+        console.log(`[orchestrator] ${issues.length} issue(s) found — running fixer agent in parallel`);
+        const fixerConfig = {
+            model: config.fixerModel,
+            apiKey: config.apiKey,
+            baseURL: config.baseURL,
+            temperature: 0.2,
+            maxTokens: 700,
+        };
+        const fixResults = yield Promise.all(issues.map((issue) => __awaiter(this, void 0, void 0, function* () {
+            const fix = yield (0, explainerFixAgent_1.runExplainerFixAgent)(issue.chunk, issue.issueType, issue.line, fixerConfig);
+            if (!fix)
+                return null;
+            return {
+                file: issue.file,
+                lineNumber: fix.lineNumber,
+                explanation: fix.explanation,
+                fixedCode: fix.fixedCode,
+                issueType: issue.issueType,
+            };
+        })));
+        return fixResults.filter((r) => r !== null);
+    });
+}
+
+
+/***/ }),
+
+/***/ 864:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.runReviewerAgent = runReviewerAgent;
+const litellm_1 = __nccwpck_require__(4132);
+const REVIEWER_PROMPT = `You are a fast code-review triage agent. Scan the TOON-encoded diff and flag ONLY critical issues.
+
+DETECT:
+- BUG: Logic errors, null/undefined risks, off-by-one, race conditions
+- SECURITY: Injection, XSS, hardcoded secrets, unsafe eval, SQL injection
+- PERFORMANCE: O(n²) in loops, memory leaks, unnecessary re-renders
+- BEST_PRACTICE: Missing error handling, edge cases, type safety
+
+SKIP: Style, formatting, naming, comments, positive feedback.
+
+OUTPUT (strict JSON, nothing else):
+{"issues":[{"file":"<path>","line":<n>,"chunk":"<minimal code snippet>","issueType":"BUG|SECURITY|PERFORMANCE|BEST_PRACTICE"}]}
+
+If no issues: {"issues":[]}`;
+function cleanJSON(raw) {
+    let cleaned = raw.trim();
+    if (cleaned.startsWith("```json")) {
+        cleaned = cleaned.replace(/^```json\s*/, "").replace(/```\s*$/, "");
+    }
+    else if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```\s*/, "").replace(/```\s*$/, "");
+    }
+    return cleaned;
+}
+function runReviewerAgent(toonDiff, config) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const response = yield (0, litellm_1.callLLM)(config, [
+            { role: "system", content: REVIEWER_PROMPT },
+            { role: "user", content: toonDiff },
+        ]);
+        if (!response) {
+            console.warn("Reviewer agent returned no response");
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(cleanJSON(response));
+            if (!parsed.issues || !Array.isArray(parsed.issues)) {
+                console.warn("Reviewer response missing issues array");
+                return [];
+            }
+            const validTypes = ["BUG", "SECURITY", "PERFORMANCE", "BEST_PRACTICE"];
+            return parsed.issues.filter((issue) => typeof issue.file === "string" &&
+                typeof issue.line === "number" &&
+                typeof issue.chunk === "string" &&
+                validTypes.indexOf(issue.issueType) !== -1);
+        }
+        catch (error) {
+            console.warn("Failed to parse reviewer agent response:", error);
+            console.warn("Raw response:", response);
+            return [];
+        }
+    });
+}
 
 
 /***/ }),
@@ -354,73 +545,6 @@ File: ${file.to || file.from}${fileExt ? ` (${fileExt})` : ""}
 
 TOON:
 ${toonData}`;
-}
-
-
-/***/ }),
-
-/***/ 4905:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-/**
- * TOON (Token-Oriented Object Notation) Parser
- * Parses LLM responses in TOON format back to structured review comments
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.parseTOONReview = parseTOONReview;
-exports.convertToGitHubComments = convertToGitHubComments;
-/**
- * Parses TOON-formatted LLM output into structured review comments
- * Handles both valid JSON and malformed responses gracefully
- */
-function parseTOONReview(output) {
-    try {
-        // Clean up the output (remove markdown code blocks if present)
-        let cleaned = output.trim();
-        // Remove markdown code fences
-        if (cleaned.startsWith("```json")) {
-            cleaned = cleaned.replace(/^```json\s*/, "").replace(/```\s*$/, "");
-        }
-        else if (cleaned.startsWith("```")) {
-            cleaned = cleaned.replace(/^```\s*/, "").replace(/```\s*$/, "");
-        }
-        const parsed = JSON.parse(cleaned);
-        // Validate the structure
-        if (!parsed.reviews || !Array.isArray(parsed.reviews)) {
-            console.warn("Invalid TOON response structure, no reviews array");
-            return [];
-        }
-        // Validate each review item
-        return parsed.reviews.filter((review) => {
-            const hasValidLine = review.lineNumber !== undefined &&
-                typeof review.lineNumber === "number";
-            const hasValidComment = review.reviewComment !== undefined &&
-                typeof review.reviewComment === "string" &&
-                review.reviewComment.length > 0;
-            if (!hasValidLine || !hasValidComment) {
-                console.warn("Skipping invalid review item:", review);
-                return false;
-            }
-            return true;
-        });
-    }
-    catch (error) {
-        console.error("Error parsing TOON review response:", error);
-        console.error("Raw output:", output);
-        return [];
-    }
-}
-/**
- * Converts parsed TOON reviews to GitHub comment format
- */
-function convertToGitHubComments(reviews, filePath) {
-    return reviews.map((review) => ({
-        body: review.reviewComment,
-        path: filePath,
-        line: review.lineNumber,
-    }));
 }
 
 
