@@ -1,5 +1,5 @@
-name: "AI Code Review Action"
-description: "Perform code reviews using any LLM provider (OpenAI, Anthropic, Google, etc.) with TOON encoding for token efficiency."
+name: "PRowl"
+description: "The multi-agent PR reviewer that never misses a bug. Detects issues with a fast model, explains and fixes them with a smarter one. Works with any LLM provider."
 inputs:
   GITHUB_TOKEN:
     description: "GitHub token to interact with the repository."
