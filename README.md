@@ -196,6 +196,12 @@ TOON encoding saves 50-70% tokens. Example for reviewing 1000 lines:
 
 ---
 
+## Presentation
+
+[View the PRowl pitch deck →](https://gamma.app/docs/The-multi-agent-PR-reviewer-that-never-misses-a-bug-di1s9mpkpq1kcb8)
+
+---
+
 ## License
 
 MIT - Free and open source
