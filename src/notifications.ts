@@ -14,7 +14,6 @@ interface NotificationContext {
   prUrl: string;
   action: string;
   commitSha?: string;
-  commitUrl?: string;
 }
 
 interface NotificationThreadRefs {
@@ -44,8 +43,8 @@ async function postJson(url: string, payload: Record<string, unknown>, headers?:
 }
 
 function buildStartMessage(context: NotificationContext): string {
-  const commitPart = context.commitSha && context.commitUrl
-    ? `Commit: ${shortenSha(context.commitSha)} (${context.commitUrl})`
+  const commitPart = context.commitSha
+    ? `Commit: ${shortenSha(context.commitSha)}`
     : "Commit: n/a";
 
   return [
