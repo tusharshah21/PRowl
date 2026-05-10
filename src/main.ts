@@ -138,9 +138,6 @@ async function main() {
   );
   const commitSha: string =
     eventData.after || eventData.pull_request?.head?.sha || "";
-  const repositoryUrl: string = eventData.repository?.html_url || "";
-  const commitUrl: string =
-    repositoryUrl && commitSha ? `${repositoryUrl}/commit/${commitSha}` : "";
 
   const notificationRefs = notifier.isEnabled()
     ? await notifier.sendStart({
@@ -150,7 +147,6 @@ async function main() {
         prUrl: prDetails.url,
         action: eventData.action || "unknown",
         commitSha,
-        commitUrl,
       })
     : {};
 
