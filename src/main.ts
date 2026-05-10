@@ -136,8 +136,6 @@ async function main() {
   const eventData = JSON.parse(
     readFileSync(process.env.GITHUB_EVENT_PATH ?? "", "utf8")
   );
-  const commitSha: string =
-    eventData.after || eventData.pull_request?.head?.sha || "";
 
   const notificationRefs = notifier.isEnabled()
     ? await notifier.sendStart({
@@ -146,7 +144,6 @@ async function main() {
         prTitle: prDetails.title,
         prUrl: prDetails.url,
         action: eventData.action || "unknown",
-        commitSha,
       })
     : {};
 
