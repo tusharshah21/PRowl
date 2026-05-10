@@ -98,6 +98,27 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_MODEL: "gpt-4o"
+
+# Optional: Discord + Slack notifications
+
+Add any of these optional secrets if you want commit-trigger and review-result notifications in chat:
+
+- `DISCORD_WEBHOOK_URL` for Discord channel notifications
+- `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` for threaded Slack notifications (recommended)
+- `SLACK_WEBHOOK_URL` for basic Slack notifications (fallback, non-threaded)
+
+Example:
+
+```yaml
+      - uses: tusharshah21/ai-code-reviewer@main
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: "gpt-4o"
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+```
 ```
 
 That's it! PRs will now get AI reviews with explanation and fix suggestions.
@@ -178,6 +199,10 @@ LLM_BASE_URL: "https://openrouter.ai/api/v1"
 | `LLM_REVIEWER_MODEL` | No | `LLM_MODEL` | Fast/cheap model for issue detection (Agent 1). Overrides `LLM_MODEL` for Agent 1 only. |
 | `LLM_FIXER_MODEL` | No | `LLM_MODEL` | Smarter model for explanation and fix generation (Agent 2). Overrides `LLM_MODEL` for Agent 2 only. |
 | `exclude` | No | - | Files to skip (glob patterns) |
+| `DISCORD_WEBHOOK_URL` | No | - | Posts a start message (commit/PR context) and a reply with reviewer results to Discord. |
+| `SLACK_BOT_TOKEN` | No | - | Slack bot token (`xoxb-...`) used for threaded messages via `chat.postMessage`. |
+| `SLACK_CHANNEL_ID` | No | - | Slack channel ID for bot-thread notifications. Used with `SLACK_BOT_TOKEN`. |
+| `SLACK_WEBHOOK_URL` | No | - | Slack incoming webhook fallback (non-threaded) when bot token/channel are not provided. |
 
 ---
 
