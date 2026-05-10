@@ -27,6 +27,22 @@ inputs:
     description: "Glob patterns to exclude files from the diff analysis"
     required: false
     default: ""
+  DISCORD_WEBHOOK_URL:
+    description: "Optional: Discord webhook URL for commit/review notifications"
+    required: false
+    default: ""
+  SLACK_BOT_TOKEN:
+    description: "Optional: Slack bot token (xoxb-...) for threaded notifications"
+    required: false
+    default: ""
+  SLACK_CHANNEL_ID:
+    description: "Optional: Slack channel ID used with SLACK_BOT_TOKEN"
+    required: false
+    default: ""
+  SLACK_WEBHOOK_URL:
+    description: "Optional: Slack incoming webhook URL (fallback, non-threaded)"
+    required: false
+    default: ""
 runs:
   using: "node20"
   main: "dist/index.js"

@@ -5,6 +5,7 @@ import parseDiff, { Chunk, File } from "parse-diff";
 import minimatch from "minimatch";
 import { encodeDiffToTOON } from "./toon/encoder";
 import { orchestrate, OrchestratorConfig } from "./orchestrator";
+import { Notifier } from "./notifications";
 
 const GITHUB_TOKEN: string = core.getInput("GITHUB_TOKEN");
 const LLM_API_KEY: string = core.getInput("LLM_API_KEY");
@@ -12,6 +13,10 @@ const LLM_MODEL: string = core.getInput("LLM_MODEL");
 const LLM_BASE_URL: string = core.getInput("LLM_BASE_URL");
 const LLM_REVIEWER_MODEL: string = core.getInput("LLM_REVIEWER_MODEL") || LLM_MODEL;
 const LLM_FIXER_MODEL: string = core.getInput("LLM_FIXER_MODEL") || LLM_MODEL;
+const DISCORD_WEBHOOK_URL: string = core.getInput("DISCORD_WEBHOOK_URL");
+const SLACK_BOT_TOKEN: string = core.getInput("SLACK_BOT_TOKEN");
+const SLACK_CHANNEL_ID: string = core.getInput("SLACK_CHANNEL_ID");
+const SLACK_WEBHOOK_URL: string = core.getInput("SLACK_WEBHOOK_URL");
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
@@ -21,6 +26,7 @@ interface PRDetails {
   pull_number: number;
   title: string;
   description: string;
+  url: string;
 }
 
 async function getPRDetails(): Promise<PRDetails> {
@@ -38,6 +44,7 @@ async function getPRDetails(): Promise<PRDetails> {
     pull_number: number,
     title: prResponse.data.title ?? "",
     description: prResponse.data.body ?? "",
+    url: prResponse.data.html_url ?? "",
   };
 }
 
@@ -59,7 +66,10 @@ async function getDiff(
 async function analyzeCode(
   parsedDiff: File[],
   prDetails: PRDetails
-): Promise<Array<{ body: string; path: string; line: number }>> {
+): Promise<{
+  comments: Array<{ body: string; path: string; line: number }>;
+  results: Awaited<ReturnType<typeof orchestrate>>;
+}> {
   const comments: Array<{ body: string; path: string; line: number }> = [];
 
   // Build full TOON-encoded diff string for the orchestrator
@@ -71,7 +81,9 @@ async function analyzeCode(
     }
   }
 
-  if (toonChunks.length === 0) return comments;
+  if (toonChunks.length === 0) {
+    return { comments, results: [] };
+  }
 
   const toonDiff = toonChunks.join("\n");
 
@@ -93,7 +105,7 @@ async function analyzeCode(
     });
   }
 
-  return comments;
+  return { comments, results };
 }
 
 async function createReviewComment(
@@ -113,10 +125,34 @@ async function createReviewComment(
 
 async function main() {
   const prDetails = await getPRDetails();
+  const notifier = new Notifier({
+    discordWebhookUrl: DISCORD_WEBHOOK_URL || undefined,
+    slackBotToken: SLACK_BOT_TOKEN || undefined,
+    slackChannelId: SLACK_CHANNEL_ID || undefined,
+    slackWebhookUrl: SLACK_WEBHOOK_URL || undefined,
+  });
+
   let diff: string | null;
   const eventData = JSON.parse(
     readFileSync(process.env.GITHUB_EVENT_PATH ?? "", "utf8")
   );
+  const commitSha: string =
+    eventData.after || eventData.pull_request?.head?.sha || "";
+  const repositoryUrl: string = eventData.repository?.html_url || "";
+  const commitUrl: string =
+    repositoryUrl && commitSha ? `${repositoryUrl}/commit/${commitSha}` : "";
+
+  const notificationRefs = notifier.isEnabled()
+    ? await notifier.sendStart({
+        repoFullName: `${prDetails.owner}/${prDetails.repo}`,
+        prNumber: prDetails.pull_number,
+        prTitle: prDetails.title,
+        prUrl: prDetails.url,
+        action: eventData.action || "unknown",
+        commitSha,
+        commitUrl,
+      })
+    : {};
 
   if (eventData.action === "opened") {
     diff = await getDiff(
@@ -162,14 +198,18 @@ async function main() {
     );
   });
 
-  const comments = await analyzeCode(filteredDiff, prDetails);
-  if (comments.length > 0) {
+  const analysis = await analyzeCode(filteredDiff, prDetails);
+  if (analysis.comments.length > 0) {
     await createReviewComment(
       prDetails.owner,
       prDetails.repo,
       prDetails.pull_number,
-      comments
+      analysis.comments
     );
+  }
+
+  if (notifier.isEnabled()) {
+    await notifier.sendResult(analysis.results, notificationRefs);
   }
 }
 

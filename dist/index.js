@@ -138,16 +138,21 @@ const parse_diff_1 = __importDefault(__nccwpck_require__(2347));
 const minimatch_1 = __importDefault(__nccwpck_require__(2868));
 const encoder_1 = __nccwpck_require__(1990);
 const orchestrator_1 = __nccwpck_require__(6709);
+const notifications_1 = __nccwpck_require__(9447);
 const GITHUB_TOKEN = core.getInput("GITHUB_TOKEN");
 const LLM_API_KEY = core.getInput("LLM_API_KEY");
 const LLM_MODEL = core.getInput("LLM_MODEL");
 const LLM_BASE_URL = core.getInput("LLM_BASE_URL");
 const LLM_REVIEWER_MODEL = core.getInput("LLM_REVIEWER_MODEL") || LLM_MODEL;
 const LLM_FIXER_MODEL = core.getInput("LLM_FIXER_MODEL") || LLM_MODEL;
+const DISCORD_WEBHOOK_URL = core.getInput("DISCORD_WEBHOOK_URL");
+const SLACK_BOT_TOKEN = core.getInput("SLACK_BOT_TOKEN");
+const SLACK_CHANNEL_ID = core.getInput("SLACK_CHANNEL_ID");
+const SLACK_WEBHOOK_URL = core.getInput("SLACK_WEBHOOK_URL");
 const octokit = new rest_1.Octokit({ auth: GITHUB_TOKEN });
 function getPRDetails() {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b;
+        var _a, _b, _c;
         const { repository, number } = JSON.parse((0, fs_1.readFileSync)(process.env.GITHUB_EVENT_PATH || "", "utf8"));
         const prResponse = yield octokit.pulls.get({
             owner: repository.owner.login,
@@ -160,6 +165,7 @@ function getPRDetails() {
             pull_number: number,
             title: (_a = prResponse.data.title) !== null && _a !== void 0 ? _a : "",
             description: (_b = prResponse.data.body) !== null && _b !== void 0 ? _b : "",
+            url: (_c = prResponse.data.html_url) !== null && _c !== void 0 ? _c : "",
         };
     });
 }
@@ -187,8 +193,9 @@ function analyzeCode(parsedDiff, prDetails) {
                 toonChunks.push((0, encoder_1.encodeDiffToTOON)(file, chunk));
             }
         }
-        if (toonChunks.length === 0)
-            return comments;
+        if (toonChunks.length === 0) {
+            return { comments, results: [] };
+        }
         const toonDiff = toonChunks.join("\n");
         const config = {
             reviewerModel: LLM_REVIEWER_MODEL,
@@ -205,7 +212,7 @@ function analyzeCode(parsedDiff, prDetails) {
                 line: result.lineNumber,
             });
         }
-        return comments;
+        return { comments, results };
     });
 }
 function createReviewComment(owner, repo, pull_number, comments) {
@@ -221,10 +228,30 @@ function createReviewComment(owner, repo, pull_number, comments) {
 }
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a;
+        var _a, _b, _c, _d;
         const prDetails = yield getPRDetails();
+        const notifier = new notifications_1.Notifier({
+            discordWebhookUrl: DISCORD_WEBHOOK_URL || undefined,
+            slackBotToken: SLACK_BOT_TOKEN || undefined,
+            slackChannelId: SLACK_CHANNEL_ID || undefined,
+            slackWebhookUrl: SLACK_WEBHOOK_URL || undefined,
+        });
         let diff;
         const eventData = JSON.parse((0, fs_1.readFileSync)((_a = process.env.GITHUB_EVENT_PATH) !== null && _a !== void 0 ? _a : "", "utf8"));
+        const commitSha = eventData.after || ((_c = (_b = eventData.pull_request) === null || _b === void 0 ? void 0 : _b.head) === null || _c === void 0 ? void 0 : _c.sha) || "";
+        const repositoryUrl = ((_d = eventData.repository) === null || _d === void 0 ? void 0 : _d.html_url) || "";
+        const commitUrl = repositoryUrl && commitSha ? `${repositoryUrl}/commit/${commitSha}` : "";
+        const notificationRefs = notifier.isEnabled()
+            ? yield notifier.sendStart({
+                repoFullName: `${prDetails.owner}/${prDetails.repo}`,
+                prNumber: prDetails.pull_number,
+                prTitle: prDetails.title,
+                prUrl: prDetails.url,
+                action: eventData.action || "unknown",
+                commitSha,
+                commitUrl,
+            })
+            : {};
         if (eventData.action === "opened") {
             diff = yield getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
         }
@@ -258,9 +285,12 @@ function main() {
         const filteredDiff = parsedDiff.filter((file) => {
             return !excludePatterns.some((pattern) => { var _a; return (0, minimatch_1.default)((_a = file.to) !== null && _a !== void 0 ? _a : "", pattern); });
         });
-        const comments = yield analyzeCode(filteredDiff, prDetails);
-        if (comments.length > 0) {
-            yield createReviewComment(prDetails.owner, prDetails.repo, prDetails.pull_number, comments);
+        const analysis = yield analyzeCode(filteredDiff, prDetails);
+        if (analysis.comments.length > 0) {
+            yield createReviewComment(prDetails.owner, prDetails.repo, prDetails.pull_number, analysis.comments);
+        }
+        if (notifier.isEnabled()) {
+            yield notifier.sendResult(analysis.results, notificationRefs);
         }
     });
 }
@@ -268,6 +298,192 @@ main().catch((error) => {
     console.error("Error:", error);
     process.exit(1);
 });
+
+
+/***/ }),
+
+/***/ 9447:
+/***/ (function(__unused_webpack_module, exports) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Notifier = void 0;
+function shortenSha(sha) {
+    if (!sha)
+        return "n/a";
+    return sha.slice(0, 7);
+}
+function appendWaitQuery(url) {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}wait=true`;
+}
+function postJson(url, payload, headers) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return fetch(url, {
+            method: "POST",
+            headers: Object.assign({ "Content-Type": "application/json" }, (headers || {})),
+            body: JSON.stringify(payload),
+        });
+    });
+}
+function buildStartMessage(context) {
+    const commitPart = context.commitSha && context.commitUrl
+        ? `Commit: ${shortenSha(context.commitSha)} (${context.commitUrl})`
+        : "Commit: n/a";
+    return [
+        `AI review started for ${context.repoFullName}`,
+        `PR #${context.prNumber}: ${context.prTitle}`,
+        `PR: ${context.prUrl}`,
+        commitPart,
+        `Event: ${context.action}`,
+    ].join("\n");
+}
+function buildResultMessage(results) {
+    if (results.length === 0) {
+        return "Review finished: no issues found by the reviewer.";
+    }
+    const lines = results.slice(0, 5).map((result) => {
+        return `- [${result.issueType}] ${result.file}:${result.lineNumber}`;
+    });
+    const extraCount = results.length - lines.length;
+    if (extraCount > 0) {
+        lines.push(`- ...and ${extraCount} more issue(s)`);
+    }
+    return [
+        `Review finished: ${results.length} issue(s) found.`,
+        "Top findings:",
+        ...lines,
+    ].join("\n");
+}
+class Notifier {
+    constructor(config) {
+        this.config = config;
+    }
+    isEnabled() {
+        return Boolean(this.config.discordWebhookUrl ||
+            this.config.slackWebhookUrl ||
+            (this.config.slackBotToken && this.config.slackChannelId));
+    }
+    sendStart(context) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const message = buildStartMessage(context);
+            const refs = {};
+            if (this.config.discordWebhookUrl) {
+                try {
+                    const response = yield postJson(appendWaitQuery(this.config.discordWebhookUrl), {
+                        content: message,
+                    });
+                    if (response.ok) {
+                        const data = (yield response.json());
+                        refs.discordMessageId = data.id;
+                    }
+                    else {
+                        console.warn("Discord start notification failed:", response.status);
+                    }
+                }
+                catch (error) {
+                    console.warn("Discord start notification error:", error);
+                }
+            }
+            if (this.config.slackBotToken && this.config.slackChannelId) {
+                try {
+                    const response = yield postJson("https://slack.com/api/chat.postMessage", {
+                        channel: this.config.slackChannelId,
+                        text: message,
+                    }, {
+                        Authorization: `Bearer ${this.config.slackBotToken}`,
+                    });
+                    const data = (yield response.json());
+                    if (response.ok && data.ok && data.ts) {
+                        refs.slackThreadTs = data.ts;
+                    }
+                    else {
+                        console.warn("Slack start notification failed:", data.error || response.status);
+                    }
+                }
+                catch (error) {
+                    console.warn("Slack start notification error:", error);
+                }
+            }
+            else if (this.config.slackWebhookUrl) {
+                try {
+                    const response = yield postJson(this.config.slackWebhookUrl, { text: message });
+                    if (!response.ok) {
+                        console.warn("Slack webhook start notification failed:", response.status);
+                    }
+                }
+                catch (error) {
+                    console.warn("Slack webhook start notification error:", error);
+                }
+            }
+            return refs;
+        });
+    }
+    sendResult(results, refs) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const message = buildResultMessage(results);
+            if (this.config.discordWebhookUrl) {
+                try {
+                    const payload = { content: message };
+                    if (refs.discordMessageId) {
+                        payload.message_reference = { message_id: refs.discordMessageId };
+                        payload.allowed_mentions = { replied_user: false };
+                    }
+                    const response = yield postJson(this.config.discordWebhookUrl, payload);
+                    if (!response.ok) {
+                        console.warn("Discord result notification failed:", response.status);
+                    }
+                }
+                catch (error) {
+                    console.warn("Discord result notification error:", error);
+                }
+            }
+            if (this.config.slackBotToken && this.config.slackChannelId) {
+                try {
+                    const payload = {
+                        channel: this.config.slackChannelId,
+                        text: message,
+                    };
+                    if (refs.slackThreadTs) {
+                        payload.thread_ts = refs.slackThreadTs;
+                    }
+                    const response = yield postJson("https://slack.com/api/chat.postMessage", payload, {
+                        Authorization: `Bearer ${this.config.slackBotToken}`,
+                    });
+                    const data = (yield response.json());
+                    if (!response.ok || !data.ok) {
+                        console.warn("Slack result notification failed:", data.error || response.status);
+                    }
+                }
+                catch (error) {
+                    console.warn("Slack result notification error:", error);
+                }
+            }
+            else if (this.config.slackWebhookUrl) {
+                try {
+                    const response = yield postJson(this.config.slackWebhookUrl, { text: message });
+                    if (!response.ok) {
+                        console.warn("Slack webhook result notification failed:", response.status);
+                    }
+                }
+                catch (error) {
+                    console.warn("Slack webhook result notification error:", error);
+                }
+            }
+        });
+    }
+}
+exports.Notifier = Notifier;
 
 
 /***/ }),
