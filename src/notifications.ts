@@ -13,17 +13,11 @@ interface NotificationContext {
   prTitle: string;
   prUrl: string;
   action: string;
-  commitSha?: string;
 }
 
 interface NotificationThreadRefs {
   discordMessageId?: string;
   slackThreadTs?: string;
-}
-
-function shortenSha(sha?: string): string {
-  if (!sha) return "n/a";
-  return sha.slice(0, 7);
 }
 
 function appendWaitQuery(url: string): string {
@@ -43,17 +37,18 @@ async function postJson(url: string, payload: Record<string, unknown>, headers?:
 }
 
 function buildStartMessage(context: NotificationContext): string {
-  const commitPart = context.commitSha
-    ? `Commit: ${shortenSha(context.commitSha)}`
-    : "Commit: n/a";
-
   return [
     `AI review started for ${context.repoFullName}`,
     `PR #${context.prNumber}: ${context.prTitle}`,
     `PR: ${context.prUrl}`,
-    commitPart,
     `Event: ${context.action}`,
   ].join("\n");
+}
+
+function truncate(input: string, maxLength: number): string {
+  const normalized = input.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 3)}...`;
 }
 
 function buildResultMessage(results: ReviewResult[]): string {
@@ -61,13 +56,17 @@ function buildResultMessage(results: ReviewResult[]): string {
     return "Review finished: no issues found by the reviewer.";
   }
 
-  const lines = results.slice(0, 5).map((result) => {
-    return `- [${result.issueType}] ${result.file}:${result.lineNumber}`;
+  const lines = results.slice(0, 3).map((result, index) => {
+    const explanation = truncate(result.explanation, 220);
+    return [
+      `${index + 1}. [${result.issueType}] ${result.file}:${result.lineNumber}`,
+      `   Detail: ${explanation}`,
+    ].join("\n");
   });
 
   const extraCount = results.length - lines.length;
   if (extraCount > 0) {
-    lines.push(`- ...and ${extraCount} more issue(s)`);
+    lines.push(`...and ${extraCount} more issue(s).`);
   }
 
   return [
