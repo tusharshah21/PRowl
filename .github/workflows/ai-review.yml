@@ -22,7 +22,7 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_REVIEWER_MODEL: "gpt-4o-mini"
+          LLM_REVIEWER_MODEL: "gpt-5"
           LLM_FIXER_MODEL: "gpt-4o"
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
