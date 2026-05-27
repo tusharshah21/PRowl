@@ -1,771 +1,6 @@
 require('./sourcemap-register.js');/******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
-/***/ 4132:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-/**
- * LLM Client Module
- *
- * Provider-agnostic interface using OpenAI-compatible API format.
- * Works with any LLM that supports OpenAI API format:
- * - OpenAI directly
- * - LiteLLM Proxy (self-hosted)
- * - OpenRouter
- * - Any OpenAI-compatible endpoint
- *
- * NO provider-specific branching. Model is a runtime string.
- */
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.callLiteLLM = void 0;
-exports.callLLM = callLLM;
-const openai_1 = __importDefault(__nccwpck_require__(2643));
-// Default to OpenAI, but users can override with any OpenAI-compatible endpoint
-const DEFAULT_BASE_URL = "https://api.openai.com/v1";
-/**
- * Calls LLM using OpenAI-compatible API format.
- *
- * This function is completely provider-agnostic:
- * - No provider detection
- * - No model name parsing
- * - Model string passed directly to API
- *
- * For non-OpenAI providers, user sets LLM_BASE_URL to their:
- * - LiteLLM proxy: http://localhost:4000/v1
- * - OpenRouter: https://openrouter.ai/api/v1
- * - Any OpenAI-compatible endpoint
- */
-function callLLM(config, messages) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c, _d, _e;
-        try {
-            const client = new openai_1.default({
-                apiKey: config.apiKey,
-                baseURL: config.baseURL || DEFAULT_BASE_URL,
-            });
-            const response = yield client.chat.completions.create({
-                model: config.model,
-                messages: messages,
-                temperature: (_a = config.temperature) !== null && _a !== void 0 ? _a : 0.2,
-                max_tokens: (_b = config.maxTokens) !== null && _b !== void 0 ? _b : 700,
-            });
-            return ((_e = (_d = (_c = response.choices[0]) === null || _c === void 0 ? void 0 : _c.message) === null || _d === void 0 ? void 0 : _d.content) === null || _e === void 0 ? void 0 : _e.trim()) || null;
-        }
-        catch (error) {
-            console.error("LLM API Error:", error);
-            if (error instanceof Error) {
-                console.error("Details:", error.message);
-            }
-            return null;
-        }
-    });
-}
-// Backward compatibility alias
-exports.callLiteLLM = callLLM;
-
-
-/***/ }),
-
-/***/ 5634:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const fs_1 = __nccwpck_require__(7147);
-const core = __importStar(__nccwpck_require__(1078));
-const rest_1 = __nccwpck_require__(6326);
-const parse_diff_1 = __importDefault(__nccwpck_require__(2347));
-const minimatch_1 = __importDefault(__nccwpck_require__(2868));
-const encoder_1 = __nccwpck_require__(1990);
-const orchestrator_1 = __nccwpck_require__(6709);
-const notifications_1 = __nccwpck_require__(9447);
-const GITHUB_TOKEN = core.getInput("GITHUB_TOKEN");
-const LLM_API_KEY = core.getInput("LLM_API_KEY");
-const LLM_MODEL = core.getInput("LLM_MODEL");
-const LLM_BASE_URL = core.getInput("LLM_BASE_URL");
-const LLM_REVIEWER_MODEL = core.getInput("LLM_REVIEWER_MODEL") || LLM_MODEL;
-const LLM_FIXER_MODEL = core.getInput("LLM_FIXER_MODEL") || LLM_MODEL;
-const DISCORD_WEBHOOK_URL = core.getInput("DISCORD_WEBHOOK_URL");
-const SLACK_BOT_TOKEN = core.getInput("SLACK_BOT_TOKEN");
-const SLACK_CHANNEL_ID = core.getInput("SLACK_CHANNEL_ID");
-const SLACK_WEBHOOK_URL = core.getInput("SLACK_WEBHOOK_URL");
-const octokit = new rest_1.Octokit({ auth: GITHUB_TOKEN });
-function getPRDetails() {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c;
-        const { repository, number } = JSON.parse((0, fs_1.readFileSync)(process.env.GITHUB_EVENT_PATH || "", "utf8"));
-        const prResponse = yield octokit.pulls.get({
-            owner: repository.owner.login,
-            repo: repository.name,
-            pull_number: number,
-        });
-        return {
-            owner: repository.owner.login,
-            repo: repository.name,
-            pull_number: number,
-            title: (_a = prResponse.data.title) !== null && _a !== void 0 ? _a : "",
-            description: (_b = prResponse.data.body) !== null && _b !== void 0 ? _b : "",
-            url: (_c = prResponse.data.html_url) !== null && _c !== void 0 ? _c : "",
-        };
-    });
-}
-function getDiff(owner, repo, pull_number) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const response = yield octokit.pulls.get({
-            owner,
-            repo,
-            pull_number,
-            mediaType: { format: "diff" },
-        });
-        // @ts-expect-error - response.data is a string
-        return response.data;
-    });
-}
-function analyzeCode(parsedDiff, prDetails) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const comments = [];
-        // Build full TOON-encoded diff string for the orchestrator
-        const toonChunks = [];
-        for (const file of parsedDiff) {
-            if (file.to === "/dev/null")
-                continue;
-            for (const chunk of file.chunks) {
-                toonChunks.push((0, encoder_1.encodeDiffToTOON)(file, chunk));
-            }
-        }
-        if (toonChunks.length === 0) {
-            return { comments, results: [] };
-        }
-        const toonDiff = toonChunks.join("\n");
-        const config = {
-            reviewerModel: LLM_REVIEWER_MODEL,
-            fixerModel: LLM_FIXER_MODEL,
-            apiKey: LLM_API_KEY,
-            baseURL: LLM_BASE_URL || undefined,
-        };
-        const results = yield (0, orchestrator_1.orchestrate)(toonDiff, config);
-        for (const result of results) {
-            const body = `**[${result.issueType}]** ${result.explanation}\n\n\`\`\`suggestion\n${result.fixedCode}\n\`\`\``;
-            comments.push({
-                body,
-                path: result.file,
-                line: result.lineNumber,
-            });
-        }
-        return { comments, results };
-    });
-}
-function createReviewComment(owner, repo, pull_number, comments) {
-    return __awaiter(this, void 0, void 0, function* () {
-        yield octokit.pulls.createReview({
-            owner,
-            repo,
-            pull_number,
-            comments,
-            event: "COMMENT",
-        });
-    });
-}
-function main() {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c, _d;
-        const prDetails = yield getPRDetails();
-        const notifier = new notifications_1.Notifier({
-            discordWebhookUrl: DISCORD_WEBHOOK_URL || undefined,
-            slackBotToken: SLACK_BOT_TOKEN || undefined,
-            slackChannelId: SLACK_CHANNEL_ID || undefined,
-            slackWebhookUrl: SLACK_WEBHOOK_URL || undefined,
-        });
-        let diff;
-        const eventData = JSON.parse((0, fs_1.readFileSync)((_a = process.env.GITHUB_EVENT_PATH) !== null && _a !== void 0 ? _a : "", "utf8"));
-        const commitSha = eventData.after || ((_c = (_b = eventData.pull_request) === null || _b === void 0 ? void 0 : _b.head) === null || _c === void 0 ? void 0 : _c.sha) || "";
-        const repositoryUrl = ((_d = eventData.repository) === null || _d === void 0 ? void 0 : _d.html_url) || "";
-        const commitUrl = repositoryUrl && commitSha ? `${repositoryUrl}/commit/${commitSha}` : "";
-        const notificationRefs = notifier.isEnabled()
-            ? yield notifier.sendStart({
-                repoFullName: `${prDetails.owner}/${prDetails.repo}`,
-                prNumber: prDetails.pull_number,
-                prTitle: prDetails.title,
-                prUrl: prDetails.url,
-                action: eventData.action || "unknown",
-                commitSha,
-                commitUrl,
-            })
-            : {};
-        if (eventData.action === "opened") {
-            diff = yield getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
-        }
-        else if (eventData.action === "synchronize") {
-            const newBaseSha = eventData.before;
-            const newHeadSha = eventData.after;
-            const response = yield octokit.repos.compareCommits({
-                headers: {
-                    accept: "application/vnd.github.v3.diff",
-                },
-                owner: prDetails.owner,
-                repo: prDetails.repo,
-                base: newBaseSha,
-                head: newHeadSha,
-            });
-            diff = String(response.data);
-        }
-        else {
-            console.log("Unsupported event:", process.env.GITHUB_EVENT_NAME);
-            return;
-        }
-        if (!diff) {
-            console.log("No diff found");
-            return;
-        }
-        const parsedDiff = (0, parse_diff_1.default)(diff);
-        const excludePatterns = core
-            .getInput("exclude")
-            .split(",")
-            .map((s) => s.trim());
-        const filteredDiff = parsedDiff.filter((file) => {
-            return !excludePatterns.some((pattern) => { var _a; return (0, minimatch_1.default)((_a = file.to) !== null && _a !== void 0 ? _a : "", pattern); });
-        });
-        const analysis = yield analyzeCode(filteredDiff, prDetails);
-        if (analysis.comments.length > 0) {
-            yield createReviewComment(prDetails.owner, prDetails.repo, prDetails.pull_number, analysis.comments);
-        }
-        if (notifier.isEnabled()) {
-            yield notifier.sendResult(analysis.results, notificationRefs);
-        }
-    });
-}
-main().catch((error) => {
-    console.error("Error:", error);
-    process.exit(1);
-});
-
-
-/***/ }),
-
-/***/ 9447:
-/***/ (function(__unused_webpack_module, exports) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.Notifier = void 0;
-function shortenSha(sha) {
-    if (!sha)
-        return "n/a";
-    return sha.slice(0, 7);
-}
-function appendWaitQuery(url) {
-    const separator = url.includes("?") ? "&" : "?";
-    return `${url}${separator}wait=true`;
-}
-function postJson(url, payload, headers) {
-    return __awaiter(this, void 0, void 0, function* () {
-        return fetch(url, {
-            method: "POST",
-            headers: Object.assign({ "Content-Type": "application/json" }, (headers || {})),
-            body: JSON.stringify(payload),
-        });
-    });
-}
-function buildStartMessage(context) {
-    const commitPart = context.commitSha && context.commitUrl
-        ? `Commit: ${shortenSha(context.commitSha)} (${context.commitUrl})`
-        : "Commit: n/a";
-    return [
-        `AI review started for ${context.repoFullName}`,
-        `PR #${context.prNumber}: ${context.prTitle}`,
-        `PR: ${context.prUrl}`,
-        commitPart,
-        `Event: ${context.action}`,
-    ].join("\n");
-}
-function buildResultMessage(results) {
-    if (results.length === 0) {
-        return "Review finished: no issues found by the reviewer.";
-    }
-    const lines = results.slice(0, 5).map((result) => {
-        return `- [${result.issueType}] ${result.file}:${result.lineNumber}`;
-    });
-    const extraCount = results.length - lines.length;
-    if (extraCount > 0) {
-        lines.push(`- ...and ${extraCount} more issue(s)`);
-    }
-    return [
-        `Review finished: ${results.length} issue(s) found.`,
-        "Top findings:",
-        ...lines,
-    ].join("\n");
-}
-class Notifier {
-    constructor(config) {
-        this.config = config;
-    }
-    isEnabled() {
-        return Boolean(this.config.discordWebhookUrl ||
-            this.config.slackWebhookUrl ||
-            (this.config.slackBotToken && this.config.slackChannelId));
-    }
-    sendStart(context) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const message = buildStartMessage(context);
-            const refs = {};
-            if (this.config.discordWebhookUrl) {
-                try {
-                    const response = yield postJson(appendWaitQuery(this.config.discordWebhookUrl), {
-                        content: message,
-                    });
-                    if (response.ok) {
-                        const data = (yield response.json());
-                        refs.discordMessageId = data.id;
-                    }
-                    else {
-                        console.warn("Discord start notification failed:", response.status);
-                    }
-                }
-                catch (error) {
-                    console.warn("Discord start notification error:", error);
-                }
-            }
-            if (this.config.slackBotToken && this.config.slackChannelId) {
-                try {
-                    const response = yield postJson("https://slack.com/api/chat.postMessage", {
-                        channel: this.config.slackChannelId,
-                        text: message,
-                    }, {
-                        Authorization: `Bearer ${this.config.slackBotToken}`,
-                    });
-                    const data = (yield response.json());
-                    if (response.ok && data.ok && data.ts) {
-                        refs.slackThreadTs = data.ts;
-                    }
-                    else {
-                        console.warn("Slack start notification failed:", data.error || response.status);
-                    }
-                }
-                catch (error) {
-                    console.warn("Slack start notification error:", error);
-                }
-            }
-            else if (this.config.slackWebhookUrl) {
-                try {
-                    const response = yield postJson(this.config.slackWebhookUrl, { text: message });
-                    if (!response.ok) {
-                        console.warn("Slack webhook start notification failed:", response.status);
-                    }
-                }
-                catch (error) {
-                    console.warn("Slack webhook start notification error:", error);
-                }
-            }
-            return refs;
-        });
-    }
-    sendResult(results, refs) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const message = buildResultMessage(results);
-            if (this.config.discordWebhookUrl) {
-                try {
-                    const payload = { content: message };
-                    if (refs.discordMessageId) {
-                        payload.message_reference = { message_id: refs.discordMessageId };
-                        payload.allowed_mentions = { replied_user: false };
-                    }
-                    const response = yield postJson(this.config.discordWebhookUrl, payload);
-                    if (!response.ok) {
-                        console.warn("Discord result notification failed:", response.status);
-                    }
-                }
-                catch (error) {
-                    console.warn("Discord result notification error:", error);
-                }
-            }
-            if (this.config.slackBotToken && this.config.slackChannelId) {
-                try {
-                    const payload = {
-                        channel: this.config.slackChannelId,
-                        text: message,
-                    };
-                    if (refs.slackThreadTs) {
-                        payload.thread_ts = refs.slackThreadTs;
-                    }
-                    const response = yield postJson("https://slack.com/api/chat.postMessage", payload, {
-                        Authorization: `Bearer ${this.config.slackBotToken}`,
-                    });
-                    const data = (yield response.json());
-                    if (!response.ok || !data.ok) {
-                        console.warn("Slack result notification failed:", data.error || response.status);
-                    }
-                }
-                catch (error) {
-                    console.warn("Slack result notification error:", error);
-                }
-            }
-            else if (this.config.slackWebhookUrl) {
-                try {
-                    const response = yield postJson(this.config.slackWebhookUrl, { text: message });
-                    if (!response.ok) {
-                        console.warn("Slack webhook result notification failed:", response.status);
-                    }
-                }
-                catch (error) {
-                    console.warn("Slack webhook result notification error:", error);
-                }
-            }
-        });
-    }
-}
-exports.Notifier = Notifier;
-
-
-/***/ }),
-
-/***/ 5152:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.runExplainerFixAgent = runExplainerFixAgent;
-const litellm_1 = __nccwpck_require__(4132);
-function buildPrompt(issueType) {
-    return `You are a senior engineer. You receive a code chunk flagged as a ${issueType} issue.
-
-Your job:
-1. Explain the problem concisely (1-3 sentences)
-2. Provide the corrected code
-
-OUTPUT (strict JSON, nothing else):
-{"explanation":"<what's wrong and why>","fixedCode":"<corrected code snippet>","lineNumber":<original line number>}`;
-}
-function cleanJSON(raw) {
-    let cleaned = raw.trim();
-    if (cleaned.startsWith("```json")) {
-        cleaned = cleaned.replace(/^```json\s*/, "").replace(/```\s*$/, "");
-    }
-    else if (cleaned.startsWith("```")) {
-        cleaned = cleaned.replace(/^```\s*/, "").replace(/```\s*$/, "");
-    }
-    return cleaned;
-}
-function runExplainerFixAgent(chunk, issueType, lineNumber, config) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const response = yield (0, litellm_1.callLLM)(config, [
-            { role: "system", content: buildPrompt(issueType) },
-            { role: "user", content: `Line ${lineNumber}:\n${chunk}` },
-        ]);
-        if (!response) {
-            console.warn("Explainer/fix agent returned no response");
-            return null;
-        }
-        try {
-            const parsed = JSON.parse(cleanJSON(response));
-            if (typeof parsed.explanation !== "string" ||
-                typeof parsed.fixedCode !== "string" ||
-                typeof parsed.lineNumber !== "number") {
-                console.warn("Invalid explainer/fix response structure");
-                return null;
-            }
-            return parsed;
-        }
-        catch (error) {
-            console.warn("Failed to parse explainer/fix response:", error);
-            console.warn("Raw response:", response);
-            return null;
-        }
-    });
-}
-
-
-/***/ }),
-
-/***/ 6709:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.orchestrate = orchestrate;
-const reviewerAgent_1 = __nccwpck_require__(864);
-const explainerFixAgent_1 = __nccwpck_require__(5152);
-function orchestrate(toonDiff, config) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const reviewerConfig = {
-            model: config.reviewerModel,
-            apiKey: config.apiKey,
-            baseURL: config.baseURL,
-            temperature: 0.2,
-            maxTokens: 700,
-        };
-        console.log(`[orchestrator] Running reviewer agent with model: ${config.reviewerModel}`);
-        const issues = yield (0, reviewerAgent_1.runReviewerAgent)(toonDiff, reviewerConfig);
-        if (issues.length === 0) {
-            console.log("[orchestrator] No issues detected — skipping fixer agent");
-            return [];
-        }
-        console.log(`[orchestrator] ${issues.length} issue(s) found — running fixer agent in parallel`);
-        const fixerConfig = {
-            model: config.fixerModel,
-            apiKey: config.apiKey,
-            baseURL: config.baseURL,
-            temperature: 0.2,
-            maxTokens: 700,
-        };
-        const fixResults = yield Promise.all(issues.map((issue) => __awaiter(this, void 0, void 0, function* () {
-            const fix = yield (0, explainerFixAgent_1.runExplainerFixAgent)(issue.chunk, issue.issueType, issue.line, fixerConfig);
-            if (!fix)
-                return null;
-            return {
-                file: issue.file,
-                lineNumber: fix.lineNumber,
-                explanation: fix.explanation,
-                fixedCode: fix.fixedCode,
-                issueType: issue.issueType,
-            };
-        })));
-        return fixResults.filter((r) => r !== null);
-    });
-}
-
-
-/***/ }),
-
-/***/ 864:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.runReviewerAgent = runReviewerAgent;
-const litellm_1 = __nccwpck_require__(4132);
-const REVIEWER_PROMPT = `You are a fast code-review triage agent. Scan the TOON-encoded diff and flag ONLY critical issues.
-
-DETECT:
-- BUG: Logic errors, null/undefined risks, off-by-one, race conditions
-- SECURITY: Injection, XSS, hardcoded secrets, unsafe eval, SQL injection
-- PERFORMANCE: O(n²) in loops, memory leaks, unnecessary re-renders
-- BEST_PRACTICE: Missing error handling, edge cases, type safety
-
-SKIP: Style, formatting, naming, comments, positive feedback.
-
-OUTPUT (strict JSON, nothing else):
-{"issues":[{"file":"<path>","line":<n>,"chunk":"<minimal code snippet>","issueType":"BUG|SECURITY|PERFORMANCE|BEST_PRACTICE"}]}
-
-If no issues: {"issues":[]}`;
-function cleanJSON(raw) {
-    let cleaned = raw.trim();
-    if (cleaned.startsWith("```json")) {
-        cleaned = cleaned.replace(/^```json\s*/, "").replace(/```\s*$/, "");
-    }
-    else if (cleaned.startsWith("```")) {
-        cleaned = cleaned.replace(/^```\s*/, "").replace(/```\s*$/, "");
-    }
-    return cleaned;
-}
-function runReviewerAgent(toonDiff, config) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const response = yield (0, litellm_1.callLLM)(config, [
-            { role: "system", content: REVIEWER_PROMPT },
-            { role: "user", content: toonDiff },
-        ]);
-        if (!response) {
-            console.warn("Reviewer agent returned no response");
-            return [];
-        }
-        try {
-            const parsed = JSON.parse(cleanJSON(response));
-            if (!parsed.issues || !Array.isArray(parsed.issues)) {
-                console.warn("Reviewer response missing issues array");
-                return [];
-            }
-            const validTypes = ["BUG", "SECURITY", "PERFORMANCE", "BEST_PRACTICE"];
-            return parsed.issues.filter((issue) => typeof issue.file === "string" &&
-                typeof issue.line === "number" &&
-                typeof issue.chunk === "string" &&
-                validTypes.indexOf(issue.issueType) !== -1);
-        }
-        catch (error) {
-            console.warn("Failed to parse reviewer agent response:", error);
-            console.warn("Raw response:", response);
-            return [];
-        }
-    });
-}
-
-
-/***/ }),
-
-/***/ 1990:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-/**
- * TOON (Token-Oriented Object Notation) Encoder
- * Converts PR diff data into compact, token-efficient format
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.encodeDiffToTOON = encodeDiffToTOON;
-exports.createTOONPrompt = createTOONPrompt;
-/**
- * Encodes a single file chunk into TOON format
- * TOON format is optimized for token efficiency:
- * - Uses abbreviations (ln, del, add)
- * - Removes unnecessary whitespace
- * - Compact JSON structure
- */
-function encodeDiffToTOON(file, chunk) {
-    const toonDiff = {
-        file: file.to || file.from || "unknown",
-        changes: chunk.changes.map((change) => {
-            const toonChange = {
-                type: change.type,
-                content: change.content,
-            };
-            // Only include line numbers that exist
-            if ("ln" in change && change.ln !== undefined) {
-                toonChange.ln = change.ln;
-            }
-            if ("ln2" in change && change.ln2 !== undefined) {
-                toonChange.ln2 = change.ln2;
-            }
-            return toonChange;
-        }),
-    };
-    // Return compact JSON (no pretty printing to save tokens)
-    return JSON.stringify(toonDiff);
-}
-/**
- * Creates a complete TOON-formatted prompt for code review
- */
-function createTOONPrompt(file, chunk, prTitle, prDescription) {
-    const toonData = encodeDiffToTOON(file, chunk);
-    const fileExt = (file.to || file.from || "").split(".").pop() || "";
-    return `You are a senior code reviewer. Analyze the diff and identify ONLY critical issues.
-
-REVIEW FOCUS (priority order):
-1. 🔴 BUGS: Logic errors, null/undefined risks, off-by-one, race conditions
-2. 🟠 SECURITY: Injection, XSS, hardcoded secrets, unsafe eval, SQL injection
-3. 🟡 PERFORMANCE: O(n²) in loops, memory leaks, unnecessary re-renders
-4. 🔵 BEST PRACTICES: Error handling, edge cases, type safety
-
-SKIP (do not comment on):
-- Style/formatting (let linters handle)
-- Minor naming suggestions
-- "Consider using X" without clear benefit
-- Adding comments to code
-- Positive feedback
-
-OUTPUT FORMAT (strict JSON):
-{"reviews":[{"lineNumber":<line>,"reviewComment":"**[BUG|SECURITY|PERF|ISSUE]** <concise problem + fix>"}]}
-
-If no issues found, return: {"reviews":[]}
-
-PR: ${prTitle}${prDescription ? ` | ${prDescription}` : ""}
-File: ${file.to || file.from}${fileExt ? ` (${fileExt})` : ""}
-
-TOON:
-${toonData}`;
-}
-
-
-/***/ }),
-
 /***/ 5399:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -36324,6 +35559,1061 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
+/***/ 793:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.cacheGet = cacheGet;
+exports.cacheSet = cacheSet;
+const crypto = __importStar(__nccwpck_require__(6113));
+const fs = __importStar(__nccwpck_require__(7147));
+const path = __importStar(__nccwpck_require__(1017));
+const os = __importStar(__nccwpck_require__(2037));
+const CACHE_DIR = path.join(os.tmpdir(), "prowl-llm-cache");
+function ensureDir() {
+    try {
+        fs.mkdirSync(CACHE_DIR, { recursive: true });
+    }
+    catch (_a) { }
+}
+function keyFor(config, messages) {
+    const h = crypto.createHash("sha256");
+    h.update(config.model);
+    h.update(" ");
+    for (const m of messages) {
+        h.update(m.role);
+        h.update(" ");
+        h.update(m.content);
+        h.update(" ");
+    }
+    return h.digest("hex");
+}
+function cacheGet(config, messages) {
+    ensureDir();
+    const file = path.join(CACHE_DIR, keyFor(config, messages));
+    try {
+        return fs.readFileSync(file, "utf8");
+    }
+    catch (_a) {
+        return null;
+    }
+}
+function cacheSet(config, messages, value) {
+    ensureDir();
+    const file = path.join(CACHE_DIR, keyFor(config, messages));
+    try {
+        fs.writeFileSync(file, value, "utf8");
+    }
+    catch (_a) { }
+}
+
+
+/***/ }),
+
+/***/ 1358:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+/**
+ * LLM Client Module
+ *
+ * Provider-agnostic interface using OpenAI-compatible API format.
+ * Works with any LLM that supports OpenAI API format:
+ * - OpenAI directly
+ * - LiteLLM Proxy (self-hosted)
+ * - OpenRouter
+ * - Any OpenAI-compatible endpoint
+ *
+ * NO provider-specific branching. Model is a runtime string.
+ */
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.callLiteLLM = void 0;
+exports.callLLM = callLLM;
+const openai_1 = __importDefault(__nccwpck_require__(2643));
+const cache_1 = __nccwpck_require__(793);
+// Default to OpenAI, but users can override with any OpenAI-compatible endpoint
+const DEFAULT_BASE_URL = "https://api.openai.com/v1";
+/**
+ * Calls LLM using OpenAI-compatible API format.
+ *
+ * This function is completely provider-agnostic:
+ * - No provider detection
+ * - No model name parsing
+ * - Model string passed directly to API
+ *
+ * For non-OpenAI providers, user sets LLM_BASE_URL to their:
+ * - LiteLLM proxy: http://localhost:4000/v1
+ * - OpenRouter: https://openrouter.ai/api/v1
+ * - Any OpenAI-compatible endpoint
+ */
+function callLLM(config, messages) {
+    return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b, _c, _d, _e;
+        const useCache = config.cache !== false;
+        if (useCache) {
+            const hit = (0, cache_1.cacheGet)(config, messages);
+            if (hit !== null) {
+                console.log(`[llm] cache hit (${config.model})`);
+                return hit;
+            }
+        }
+        try {
+            const client = new openai_1.default({
+                apiKey: config.apiKey,
+                baseURL: config.baseURL || DEFAULT_BASE_URL,
+            });
+            const response = yield client.chat.completions.create({
+                model: config.model,
+                messages: messages,
+                temperature: (_a = config.temperature) !== null && _a !== void 0 ? _a : 0.2,
+                max_tokens: (_b = config.maxTokens) !== null && _b !== void 0 ? _b : 700,
+            });
+            const content = ((_e = (_d = (_c = response.choices[0]) === null || _c === void 0 ? void 0 : _c.message) === null || _d === void 0 ? void 0 : _d.content) === null || _e === void 0 ? void 0 : _e.trim()) || null;
+            if (useCache && content)
+                (0, cache_1.cacheSet)(config, messages, content);
+            return content;
+        }
+        catch (error) {
+            console.error("LLM API Error:", error);
+            if (error instanceof Error) {
+                console.error("Details:", error.message);
+            }
+            return null;
+        }
+    });
+}
+// Backward compatibility alias
+exports.callLiteLLM = callLLM;
+
+
+/***/ }),
+
+/***/ 4772:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const fs_1 = __nccwpck_require__(7147);
+const core = __importStar(__nccwpck_require__(1078));
+const rest_1 = __nccwpck_require__(6326);
+const parse_diff_1 = __importDefault(__nccwpck_require__(2347));
+const minimatch_1 = __importDefault(__nccwpck_require__(2868));
+const encoder_1 = __nccwpck_require__(3911);
+const orchestrator_1 = __nccwpck_require__(804);
+const notifications_1 = __nccwpck_require__(2938);
+const semgrep_1 = __nccwpck_require__(9192);
+const GITHUB_TOKEN = core.getInput("GITHUB_TOKEN");
+const LLM_API_KEY = core.getInput("LLM_API_KEY");
+const LLM_MODEL = core.getInput("LLM_MODEL");
+const LLM_BASE_URL = core.getInput("LLM_BASE_URL");
+const LLM_REVIEWER_MODEL = core.getInput("LLM_REVIEWER_MODEL") || LLM_MODEL;
+const LLM_FIXER_MODEL = core.getInput("LLM_FIXER_MODEL") || LLM_MODEL;
+const DISCORD_WEBHOOK_URL = core.getInput("DISCORD_WEBHOOK_URL");
+const SLACK_BOT_TOKEN = core.getInput("SLACK_BOT_TOKEN");
+const SLACK_CHANNEL_ID = core.getInput("SLACK_CHANNEL_ID");
+const SLACK_WEBHOOK_URL = core.getInput("SLACK_WEBHOOK_URL");
+const CONTEXT_LINES = parseInt(core.getInput("CONTEXT_LINES") || "2", 10);
+const ENABLE_CACHE = (core.getInput("ENABLE_CACHE") || "true").toLowerCase() !== "false";
+const SEMGREP_RULES = core.getInput("SEMGREP_RULES") || "";
+const octokit = new rest_1.Octokit({ auth: GITHUB_TOKEN });
+function getPRDetails() {
+    return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b, _c;
+        const { repository, number } = JSON.parse((0, fs_1.readFileSync)(process.env.GITHUB_EVENT_PATH || "", "utf8"));
+        const prResponse = yield octokit.pulls.get({
+            owner: repository.owner.login,
+            repo: repository.name,
+            pull_number: number,
+        });
+        return {
+            owner: repository.owner.login,
+            repo: repository.name,
+            pull_number: number,
+            title: (_a = prResponse.data.title) !== null && _a !== void 0 ? _a : "",
+            description: (_b = prResponse.data.body) !== null && _b !== void 0 ? _b : "",
+            url: (_c = prResponse.data.html_url) !== null && _c !== void 0 ? _c : "",
+        };
+    });
+}
+function getDiff(owner, repo, pull_number) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const response = yield octokit.pulls.get({
+            owner,
+            repo,
+            pull_number,
+            mediaType: { format: "diff" },
+        });
+        // @ts-expect-error - response.data is a string
+        return response.data;
+    });
+}
+function analyzeCode(parsedDiff, prDetails) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const comments = [];
+        const toonDiff = (0, encoder_1.encodeFilesToTOON)(parsedDiff, { contextLines: CONTEXT_LINES });
+        if (toonDiff.length === 0) {
+            return { comments, results: [] };
+        }
+        let semgrepFindings = "";
+        if (SEMGREP_RULES) {
+            const changedFiles = parsedDiff
+                .map((f) => f.to)
+                .filter((p) => !!p && p !== "/dev/null");
+            const findings = (0, semgrep_1.runSemgrep)(changedFiles, SEMGREP_RULES);
+            if (findings.length > 0) {
+                console.log(`[semgrep] ${findings.length} finding(s)`);
+                semgrepFindings = (0, semgrep_1.formatFindings)(findings);
+            }
+        }
+        const config = {
+            reviewerModel: LLM_REVIEWER_MODEL,
+            fixerModel: LLM_FIXER_MODEL,
+            apiKey: LLM_API_KEY,
+            baseURL: LLM_BASE_URL || undefined,
+            cache: ENABLE_CACHE,
+            semgrepFindings: semgrepFindings || undefined,
+        };
+        const results = yield (0, orchestrator_1.orchestrate)(toonDiff, config);
+        for (const result of results) {
+            const body = `**[${result.issueType}]** ${result.explanation}\n\n\`\`\`suggestion\n${result.fixedCode}\n\`\`\``;
+            comments.push({
+                body,
+                path: result.file,
+                line: result.lineNumber,
+            });
+        }
+        return { comments, results };
+    });
+}
+function createReviewComment(owner, repo, pull_number, comments) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield octokit.pulls.createReview({
+            owner,
+            repo,
+            pull_number,
+            comments,
+            event: "COMMENT",
+        });
+    });
+}
+function main() {
+    return __awaiter(this, void 0, void 0, function* () {
+        var _a;
+        const prDetails = yield getPRDetails();
+        const notifier = new notifications_1.Notifier({
+            discordWebhookUrl: DISCORD_WEBHOOK_URL || undefined,
+            slackBotToken: SLACK_BOT_TOKEN || undefined,
+            slackChannelId: SLACK_CHANNEL_ID || undefined,
+            slackWebhookUrl: SLACK_WEBHOOK_URL || undefined,
+        });
+        let diff;
+        const eventData = JSON.parse((0, fs_1.readFileSync)((_a = process.env.GITHUB_EVENT_PATH) !== null && _a !== void 0 ? _a : "", "utf8"));
+        const notificationRefs = notifier.isEnabled()
+            ? yield notifier.sendStart({
+                repoFullName: `${prDetails.owner}/${prDetails.repo}`,
+                prNumber: prDetails.pull_number,
+                prTitle: prDetails.title,
+                prUrl: prDetails.url,
+                action: eventData.action || "unknown",
+            })
+            : {};
+        if (eventData.action === "opened") {
+            diff = yield getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
+        }
+        else if (eventData.action === "synchronize") {
+            const newBaseSha = eventData.before;
+            const newHeadSha = eventData.after;
+            const response = yield octokit.repos.compareCommits({
+                headers: {
+                    accept: "application/vnd.github.v3.diff",
+                },
+                owner: prDetails.owner,
+                repo: prDetails.repo,
+                base: newBaseSha,
+                head: newHeadSha,
+            });
+            diff = String(response.data);
+        }
+        else {
+            console.log("Unsupported event:", process.env.GITHUB_EVENT_NAME);
+            return;
+        }
+        if (!diff) {
+            console.log("No diff found");
+            return;
+        }
+        const parsedDiff = (0, parse_diff_1.default)(diff);
+        const excludePatterns = core
+            .getInput("exclude")
+            .split(",")
+            .map((s) => s.trim());
+        const filteredDiff = parsedDiff.filter((file) => {
+            return !excludePatterns.some((pattern) => { var _a; return (0, minimatch_1.default)((_a = file.to) !== null && _a !== void 0 ? _a : "", pattern); });
+        });
+        const analysis = yield analyzeCode(filteredDiff, prDetails);
+        if (analysis.comments.length > 0) {
+            yield createReviewComment(prDetails.owner, prDetails.repo, prDetails.pull_number, analysis.comments);
+        }
+        if (notifier.isEnabled()) {
+            yield notifier.sendResult(analysis.results, notificationRefs);
+        }
+    });
+}
+main().catch((error) => {
+    console.error("Error:", error);
+    process.exit(1);
+});
+
+
+/***/ }),
+
+/***/ 2938:
+/***/ (function(__unused_webpack_module, exports) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Notifier = void 0;
+function appendWaitQuery(url) {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}wait=true`;
+}
+function postJson(url, payload, headers) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return fetch(url, {
+            method: "POST",
+            headers: Object.assign({ "Content-Type": "application/json" }, (headers || {})),
+            body: JSON.stringify(payload),
+        });
+    });
+}
+function buildStartMessage(context) {
+    return [
+        `AI review started for ${context.repoFullName}`,
+        `PR #${context.prNumber}: ${context.prTitle}`,
+        `PR: ${context.prUrl}`,
+        `Event: ${context.action}`,
+    ].join("\n");
+}
+function truncate(input, maxLength) {
+    const normalized = input.replace(/\s+/g, " ").trim();
+    if (normalized.length <= maxLength)
+        return normalized;
+    return `${normalized.slice(0, maxLength - 3)}...`;
+}
+function buildResultMessage(results) {
+    if (results.length === 0) {
+        return "Review finished: no issues found by the reviewer.";
+    }
+    const lines = results.slice(0, 3).map((result, index) => {
+        const explanation = truncate(result.explanation, 220);
+        return [
+            `${index + 1}. [${result.issueType}] ${result.file}:${result.lineNumber}`,
+            `   Detail: ${explanation}`,
+        ].join("\n");
+    });
+    const extraCount = results.length - lines.length;
+    if (extraCount > 0) {
+        lines.push(`...and ${extraCount} more issue(s).`);
+    }
+    return [
+        `Review finished: ${results.length} issue(s) found.`,
+        "Top findings:",
+        ...lines,
+    ].join("\n");
+}
+class Notifier {
+    constructor(config) {
+        this.config = config;
+    }
+    isEnabled() {
+        return Boolean(this.config.discordWebhookUrl ||
+            this.config.slackWebhookUrl ||
+            (this.config.slackBotToken && this.config.slackChannelId));
+    }
+    sendStart(context) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const message = buildStartMessage(context);
+            const refs = {};
+            if (this.config.discordWebhookUrl) {
+                try {
+                    const response = yield postJson(appendWaitQuery(this.config.discordWebhookUrl), {
+                        content: message,
+                    });
+                    if (response.ok) {
+                        const data = (yield response.json());
+                        refs.discordMessageId = data.id;
+                    }
+                    else {
+                        console.warn("Discord start notification failed:", response.status);
+                    }
+                }
+                catch (error) {
+                    console.warn("Discord start notification error:", error);
+                }
+            }
+            if (this.config.slackBotToken && this.config.slackChannelId) {
+                try {
+                    const response = yield postJson("https://slack.com/api/chat.postMessage", {
+                        channel: this.config.slackChannelId,
+                        text: message,
+                    }, {
+                        Authorization: `Bearer ${this.config.slackBotToken}`,
+                    });
+                    const data = (yield response.json());
+                    if (response.ok && data.ok && data.ts) {
+                        refs.slackThreadTs = data.ts;
+                    }
+                    else {
+                        console.warn("Slack start notification failed:", data.error || response.status);
+                    }
+                }
+                catch (error) {
+                    console.warn("Slack start notification error:", error);
+                }
+            }
+            else if (this.config.slackWebhookUrl) {
+                try {
+                    const response = yield postJson(this.config.slackWebhookUrl, { text: message });
+                    if (!response.ok) {
+                        console.warn("Slack webhook start notification failed:", response.status);
+                    }
+                }
+                catch (error) {
+                    console.warn("Slack webhook start notification error:", error);
+                }
+            }
+            return refs;
+        });
+    }
+    sendResult(results, refs) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const message = buildResultMessage(results);
+            if (this.config.discordWebhookUrl) {
+                try {
+                    const payload = { content: message };
+                    if (refs.discordMessageId) {
+                        payload.message_reference = { message_id: refs.discordMessageId };
+                        payload.allowed_mentions = { replied_user: false };
+                    }
+                    const response = yield postJson(this.config.discordWebhookUrl, payload);
+                    if (!response.ok) {
+                        console.warn("Discord result notification failed:", response.status);
+                    }
+                }
+                catch (error) {
+                    console.warn("Discord result notification error:", error);
+                }
+            }
+            if (this.config.slackBotToken && this.config.slackChannelId) {
+                try {
+                    const payload = {
+                        channel: this.config.slackChannelId,
+                        text: message,
+                    };
+                    if (refs.slackThreadTs) {
+                        payload.thread_ts = refs.slackThreadTs;
+                    }
+                    const response = yield postJson("https://slack.com/api/chat.postMessage", payload, {
+                        Authorization: `Bearer ${this.config.slackBotToken}`,
+                    });
+                    const data = (yield response.json());
+                    if (!response.ok || !data.ok) {
+                        console.warn("Slack result notification failed:", data.error || response.status);
+                    }
+                }
+                catch (error) {
+                    console.warn("Slack result notification error:", error);
+                }
+            }
+            else if (this.config.slackWebhookUrl) {
+                try {
+                    const response = yield postJson(this.config.slackWebhookUrl, { text: message });
+                    if (!response.ok) {
+                        console.warn("Slack webhook result notification failed:", response.status);
+                    }
+                }
+                catch (error) {
+                    console.warn("Slack webhook result notification error:", error);
+                }
+            }
+        });
+    }
+}
+exports.Notifier = Notifier;
+
+
+/***/ }),
+
+/***/ 8784:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.runExplainerFixAgent = runExplainerFixAgent;
+const fs = __importStar(__nccwpck_require__(7147));
+const litellm_1 = __nccwpck_require__(1358);
+const SURROUNDING_LINES = 15;
+function buildPrompt(issueType) {
+    return `You are a senior engineer. You receive a code chunk flagged as a ${issueType} issue, optionally with surrounding file context.
+
+Your job:
+1. Explain the problem concisely (1-3 sentences)
+2. Provide the corrected code (only the chunk, not the surrounding context)
+
+OUTPUT (strict JSON, nothing else):
+{"explanation":"<what's wrong and why>","fixedCode":"<corrected code snippet>","lineNumber":<original line number>}`;
+}
+function readSurrounding(filePath, line) {
+    try {
+        if (!filePath || !fs.existsSync(filePath))
+            return null;
+        const lines = fs.readFileSync(filePath, "utf8").split("\n");
+        const lo = Math.max(0, line - 1 - SURROUNDING_LINES);
+        const hi = Math.min(lines.length, line + SURROUNDING_LINES);
+        const slice = lines.slice(lo, hi);
+        return slice.map((l, i) => `${lo + i + 1}: ${l}`).join("\n");
+    }
+    catch (_a) {
+        return null;
+    }
+}
+function cleanJSON(raw) {
+    let cleaned = raw.trim();
+    if (cleaned.startsWith("```json")) {
+        cleaned = cleaned.replace(/^```json\s*/, "").replace(/```\s*$/, "");
+    }
+    else if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```\s*/, "").replace(/```\s*$/, "");
+    }
+    return cleaned;
+}
+function runExplainerFixAgent(chunk, issueType, lineNumber, config, filePath) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const surrounding = filePath ? readSurrounding(filePath, lineNumber) : null;
+        const userParts = [`Line ${lineNumber}:`, chunk];
+        if (surrounding) {
+            userParts.push("", "Surrounding file context (line: code):", surrounding);
+        }
+        const response = yield (0, litellm_1.callLLM)(config, [
+            { role: "system", content: buildPrompt(issueType) },
+            { role: "user", content: userParts.join("\n") },
+        ]);
+        if (!response) {
+            console.warn("Explainer/fix agent returned no response");
+            return null;
+        }
+        try {
+            const parsed = JSON.parse(cleanJSON(response));
+            if (typeof parsed.explanation !== "string" ||
+                typeof parsed.fixedCode !== "string" ||
+                typeof parsed.lineNumber !== "number") {
+                console.warn("Invalid explainer/fix response structure");
+                return null;
+            }
+            return parsed;
+        }
+        catch (error) {
+            console.warn("Failed to parse explainer/fix response:", error);
+            console.warn("Raw response:", response);
+            return null;
+        }
+    });
+}
+
+
+/***/ }),
+
+/***/ 804:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.orchestrate = orchestrate;
+const reviewerAgent_1 = __nccwpck_require__(130);
+const explainerFixAgent_1 = __nccwpck_require__(8784);
+function orchestrate(toonDiff, config) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const reviewerConfig = {
+            model: config.reviewerModel,
+            apiKey: config.apiKey,
+            baseURL: config.baseURL,
+            temperature: 0.2,
+            maxTokens: 700,
+            cache: config.cache,
+        };
+        console.log(`[orchestrator] Running reviewer agent with model: ${config.reviewerModel}`);
+        const issues = yield (0, reviewerAgent_1.runReviewerAgent)(toonDiff, reviewerConfig, config.semgrepFindings);
+        if (issues.length === 0) {
+            console.log("[orchestrator] No issues detected — skipping fixer agent");
+            return [];
+        }
+        console.log(`[orchestrator] ${issues.length} issue(s) found — running fixer agent in parallel`);
+        const fixerConfig = {
+            model: config.fixerModel,
+            apiKey: config.apiKey,
+            baseURL: config.baseURL,
+            temperature: 0.2,
+            maxTokens: 700,
+            cache: config.cache,
+        };
+        const fixResults = yield Promise.all(issues.map((issue) => __awaiter(this, void 0, void 0, function* () {
+            const fix = yield (0, explainerFixAgent_1.runExplainerFixAgent)(issue.chunk, issue.issueType, issue.line, fixerConfig, issue.file);
+            if (!fix)
+                return null;
+            return {
+                file: issue.file,
+                lineNumber: fix.lineNumber,
+                explanation: fix.explanation,
+                fixedCode: fix.fixedCode,
+                issueType: issue.issueType,
+            };
+        })));
+        return fixResults.filter((r) => r !== null);
+    });
+}
+
+
+/***/ }),
+
+/***/ 130:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.runReviewerAgent = runReviewerAgent;
+const litellm_1 = __nccwpck_require__(1358);
+const REVIEWER_PROMPT = `You are a fast code-review triage agent. Scan the TOON-encoded diff and flag ONLY critical issues.
+
+TOON format:
+  F:<path>              file header
+  C[N]{op,ln,code}:     N change rows follow, fields = op, ln, code
+  <op>,<ln>,"<code>"    one row. op is "+" (added), "-" (removed), " " (context). ln is the line number. code is JSON-quoted.
+
+Focus on added ("+") lines; context (" ") is for understanding only — never flag it. Removed ("-") lines are gone, so flag only if their removal causes the bug.
+
+DETECT:
+- BUG: Logic errors, null/undefined risks, off-by-one, race conditions
+- SECURITY: Injection, XSS, hardcoded secrets, unsafe eval, SQL injection
+- PERFORMANCE: O(n²) in loops, memory leaks, unnecessary re-renders
+- BEST_PRACTICE: Missing error handling, edge cases, type safety
+
+SKIP: Style, formatting, naming, comments, positive feedback.
+
+OUTPUT (strict JSON, nothing else):
+{"issues":[{"file":"<path from F: header>","line":<ln from the row>,"chunk":"<the code field of the offending row>","issueType":"BUG|SECURITY|PERFORMANCE|BEST_PRACTICE"}]}
+
+If no issues: {"issues":[]}`;
+function cleanJSON(raw) {
+    let cleaned = raw.trim();
+    if (cleaned.startsWith("```json")) {
+        cleaned = cleaned.replace(/^```json\s*/, "").replace(/```\s*$/, "");
+    }
+    else if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```\s*/, "").replace(/```\s*$/, "");
+    }
+    return cleaned;
+}
+function runReviewerAgent(toonDiff, config, semgrepFindings) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const userContent = semgrepFindings
+            ? `Static analyzer (Semgrep) flagged the following — treat as priors, verify before reporting:\n${semgrepFindings}\n\nDiff:\n${toonDiff}`
+            : toonDiff;
+        const response = yield (0, litellm_1.callLLM)(config, [
+            { role: "system", content: REVIEWER_PROMPT },
+            { role: "user", content: userContent },
+        ]);
+        if (!response) {
+            console.warn("Reviewer agent returned no response");
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(cleanJSON(response));
+            if (!parsed.issues || !Array.isArray(parsed.issues)) {
+                console.warn("Reviewer response missing issues array");
+                return [];
+            }
+            const validTypes = ["BUG", "SECURITY", "PERFORMANCE", "BEST_PRACTICE"];
+            return parsed.issues.filter((issue) => typeof issue.file === "string" &&
+                typeof issue.line === "number" &&
+                typeof issue.chunk === "string" &&
+                validTypes.indexOf(issue.issueType) !== -1);
+        }
+        catch (error) {
+            console.warn("Failed to parse reviewer agent response:", error);
+            console.warn("Raw response:", response);
+            return [];
+        }
+    });
+}
+
+
+/***/ }),
+
+/***/ 9192:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.runSemgrep = runSemgrep;
+exports.formatFindings = formatFindings;
+const child_process_1 = __nccwpck_require__(2081);
+const fs = __importStar(__nccwpck_require__(7147));
+const path = __importStar(__nccwpck_require__(1017));
+const os = __importStar(__nccwpck_require__(2037));
+function semgrepAvailable() {
+    const res = (0, child_process_1.spawnSync)("semgrep", ["--version"], { encoding: "utf8" });
+    return res.status === 0;
+}
+/**
+ * Run Semgrep against changed files using the given configs (e.g. "p/security-audit,p/owasp-top-ten").
+ * Returns up to `limit` findings restricted to the file paths supplied.
+ * Returns [] silently if semgrep is not installed or fails.
+ */
+function runSemgrep(changedFiles, configs, limit = 30) {
+    var _a;
+    if (!configs.trim())
+        return [];
+    if (!semgrepAvailable()) {
+        console.log("[semgrep] not installed, skipping");
+        return [];
+    }
+    const targets = changedFiles.filter((f) => f && fs.existsSync(f));
+    if (targets.length === 0)
+        return [];
+    const outFile = path.join(os.tmpdir(), `semgrep-${Date.now()}.json`);
+    const args = ["--json", "-o", outFile, "--quiet"];
+    for (const c of configs.split(",").map((s) => s.trim()).filter(Boolean)) {
+        args.push("--config", c);
+    }
+    args.push(...targets);
+    const res = (0, child_process_1.spawnSync)("semgrep", args, { encoding: "utf8" });
+    if (res.status !== 0 && res.status !== 1) {
+        // 0 = clean, 1 = findings; anything else is a failure
+        console.warn("[semgrep] failed:", (_a = res.stderr) === null || _a === void 0 ? void 0 : _a.slice(0, 200));
+        return [];
+    }
+    try {
+        const raw = JSON.parse(fs.readFileSync(outFile, "utf8"));
+        const results = Array.isArray(raw.results) ? raw.results : [];
+        return results.slice(0, limit).map((r) => {
+            var _a, _b, _c, _d, _e, _f;
+            return ({
+                file: r.path,
+                line: (_b = (_a = r.start) === null || _a === void 0 ? void 0 : _a.line) !== null && _b !== void 0 ? _b : 0,
+                ruleId: r.check_id,
+                message: ((_d = (_c = r.extra) === null || _c === void 0 ? void 0 : _c.message) !== null && _d !== void 0 ? _d : "").split("\n")[0].slice(0, 200),
+                severity: (_f = (_e = r.extra) === null || _e === void 0 ? void 0 : _e.severity) !== null && _f !== void 0 ? _f : "INFO",
+            });
+        });
+    }
+    catch (e) {
+        console.warn("[semgrep] could not parse output:", e);
+        return [];
+    }
+}
+function formatFindings(findings) {
+    if (findings.length === 0)
+        return "";
+    return findings
+        .map((f) => `${f.severity} ${f.file}:${f.line} [${f.ruleId}] ${f.message}`)
+        .join("\n");
+}
+
+
+/***/ }),
+
+/***/ 3911:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/**
+ * TOON (Token-Oriented Object Notation) Encoder
+ *
+ * Compact tabular encoding for PR diffs. Declares a row schema once per file
+ * instead of repeating field names on every change row, and strips unchanged
+ * context lines beyond a small window around any add/del.
+ *
+ * Format:
+ *   F:<path>
+ *   C[N]{op,ln,code}:
+ *   <op>,<ln>,<json-quoted-code>
+ *   ...
+ *
+ * op is "+" (add), "-" (del), or " " (context).
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.encodeFilesToTOON = encodeFilesToTOON;
+exports.encodeDiffToTOON = encodeDiffToTOON;
+function stripLeadingMarker(content, op) {
+    if (content.length > 0 && content[0] === op)
+        return content.slice(1);
+    return content;
+}
+function rowsFromChunk(chunk, contextLines) {
+    var _a, _b, _c, _d;
+    const changes = chunk.changes;
+    const keep = new Array(changes.length).fill(false);
+    for (let i = 0; i < changes.length; i++) {
+        if (changes[i].type !== "normal") {
+            const lo = Math.max(0, i - contextLines);
+            const hi = Math.min(changes.length - 1, i + contextLines);
+            for (let j = lo; j <= hi; j++)
+                keep[j] = true;
+        }
+    }
+    const rows = [];
+    for (let i = 0; i < changes.length; i++) {
+        if (!keep[i])
+            continue;
+        const c = changes[i];
+        const op = c.type === "add" ? "+" : c.type === "del" ? "-" : " ";
+        const ln = c.type === "normal"
+            ? ((_b = (_a = c.ln2) !== null && _a !== void 0 ? _a : c.ln1) !== null && _b !== void 0 ? _b : 0)
+            : ((_c = c.ln) !== null && _c !== void 0 ? _c : 0);
+        rows.push({ op, ln, code: stripLeadingMarker((_d = c.content) !== null && _d !== void 0 ? _d : "", op) });
+    }
+    return rows;
+}
+/**
+ * Encode a list of parsed diff files into a single compact TOON string.
+ * This is the primary encoder used by the action.
+ */
+function encodeFilesToTOON(files, opts = {}) {
+    var _a;
+    const ctx = (_a = opts.contextLines) !== null && _a !== void 0 ? _a : 2;
+    const out = [];
+    for (const file of files) {
+        if (file.to === "/dev/null")
+            continue;
+        const path = file.to || file.from || "unknown";
+        const rows = [];
+        for (const chunk of file.chunks) {
+            rows.push(...rowsFromChunk(chunk, ctx));
+        }
+        if (rows.length === 0)
+            continue;
+        out.push(`F:${path}`);
+        out.push(`C[${rows.length}]{op,ln,code}:`);
+        for (const r of rows) {
+            out.push(`${r.op},${r.ln},${JSON.stringify(r.code)}`);
+        }
+    }
+    return out.join("\n");
+}
+/**
+ * Legacy per-chunk encoder kept for backward compatibility with any external
+ * callers. Internally we now build the TOON document at the file level via
+ * encodeFilesToTOON.
+ */
+function encodeDiffToTOON(file, chunk) {
+    return encodeFilesToTOON([Object.assign(Object.assign({}, file), { chunks: [chunk] })]);
+}
+
+
+/***/ }),
+
 /***/ 326:
 /***/ ((module) => {
 
@@ -49914,7 +50204,7 @@ module.exports = JSON.parse('[[[0,44],"disallowed_STD3_valid"],[[45,46],"valid"]
 /******/ 	// startup
 /******/ 	// Load entry module and return exports
 /******/ 	// This entry module is referenced by other modules so it can't be inlined
-/******/ 	var __webpack_exports__ = __nccwpck_require__(5634);
+/******/ 	var __webpack_exports__ = __nccwpck_require__(4772);
 /******/ 	module.exports = __webpack_exports__;
 /******/ 	
 /******/ })()

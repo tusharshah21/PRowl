@@ -1,15 +1,31 @@
+import * as fs from "fs";
 import { callLLM, LLMConfig } from "../llm/litellm";
 import { ExplainerFixResponse, IssueType } from "./types";
 
+const SURROUNDING_LINES = 15;
+
 function buildPrompt(issueType: IssueType): string {
-  return `You are a senior engineer. You receive a code chunk flagged as a ${issueType} issue.
+  return `You are a senior engineer. You receive a code chunk flagged as a ${issueType} issue, optionally with surrounding file context.
 
 Your job:
 1. Explain the problem concisely (1-3 sentences)
-2. Provide the corrected code
+2. Provide the corrected code (only the chunk, not the surrounding context)
 
 OUTPUT (strict JSON, nothing else):
 {"explanation":"<what's wrong and why>","fixedCode":"<corrected code snippet>","lineNumber":<original line number>}`;
+}
+
+function readSurrounding(filePath: string, line: number): string | null {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) return null;
+    const lines = fs.readFileSync(filePath, "utf8").split("\n");
+    const lo = Math.max(0, line - 1 - SURROUNDING_LINES);
+    const hi = Math.min(lines.length, line + SURROUNDING_LINES);
+    const slice = lines.slice(lo, hi);
+    return slice.map((l, i) => `${lo + i + 1}: ${l}`).join("\n");
+  } catch {
+    return null;
+  }
 }
 
 function cleanJSON(raw: string): string {
@@ -26,11 +42,17 @@ export async function runExplainerFixAgent(
   chunk: string,
   issueType: IssueType,
   lineNumber: number,
-  config: LLMConfig
+  config: LLMConfig,
+  filePath?: string
 ): Promise<ExplainerFixResponse | null> {
+  const surrounding = filePath ? readSurrounding(filePath, lineNumber) : null;
+  const userParts = [`Line ${lineNumber}:`, chunk];
+  if (surrounding) {
+    userParts.push("", "Surrounding file context (line: code):", surrounding);
+  }
   const response = await callLLM(config, [
     { role: "system", content: buildPrompt(issueType) },
-    { role: "user", content: `Line ${lineNumber}:\n${chunk}` },
+    { role: "user", content: userParts.join("\n") },
   ]);
 
   if (!response) {

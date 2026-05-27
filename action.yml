@@ -27,6 +27,18 @@ inputs:
     description: "Glob patterns to exclude files from the diff analysis"
     required: false
     default: ""
+  CONTEXT_LINES:
+    description: "Unchanged lines kept around each +/- in the TOON diff (lower = cheaper, higher = more context). Set 0 to drop all context."
+    required: false
+    default: "2"
+  ENABLE_CACHE:
+    description: "Cache LLM responses by chunk hash across runs in the same job. Set 'false' to disable."
+    required: false
+    default: "true"
+  SEMGREP_RULES:
+    description: "Optional: comma-separated Semgrep rulesets (e.g. 'p/security-audit,p/owasp-top-ten'). If set and 'semgrep' is on PATH, findings are passed to Agent 1 as priors."
+    required: false
+    default: ""
   DISCORD_WEBHOOK_URL:
     description: "Optional: Discord webhook URL for commit/review notifications"
     required: false
