@@ -42,7 +42,9 @@ flowchart TD
 - 🔓 **Open Source** - Self-hostable, no vendor lock-in
 - 🔑 **BYOK** - Bring Your Own API Key
 - 🌐 **Multi-Provider** - OpenAI, Groq, Mistral, DeepSeek, Gemini, and more
-- ⚡ **Token-Efficient** - 50-70% cost reduction with TOON encoding
+- ⚡ **Token-Efficient** - ~45% smaller than verbose JSON, ~20% smaller than raw unified diff (benchmarked) thanks to TOON encoding + context trimming
+- 🧪 **Optional Semgrep pre-pass** - Free static analyzer flags candidates; LLM verifies and explains
+- 💾 **Response caching** - Identical chunks within a job are not re-billed
 - 🤖 **2-Agent Pipeline** - Cheap model detects issues; smarter model explains and fixes them
 - 💰 **Zero Downstream Cost** - Fixer agent is skipped entirely when no issues are found
 
@@ -60,6 +62,8 @@ Works with any OpenAI-compatible API:
 | [Fireworks](https://fireworks.ai) | ✅ Yes | `https://api.fireworks.ai/inference/v1` |
 | [OpenRouter](https://openrouter.ai) | No | `https://openrouter.ai/api/v1` |
 | [Google Gemini](https://ai.google.dev) | ✅ Yes | `https://generativelanguage.googleapis.com/v1beta/openai` |
+| [Ollama](https://ollama.com) (self-hosted, 100% private) | ✅ Free | `http://localhost:11434/v1` |
+| [GitHub Models](https://github.com/marketplace/models) | ✅ Free for public repos | `https://models.inference.ai.azure.com` |
 
 ## Quick Start
 
@@ -186,6 +190,20 @@ LLM_MODEL: "anthropic/claude-3.5-sonnet"
 LLM_BASE_URL: "https://openrouter.ai/api/v1"
 ```
 
+### Ollama (self-hosted, fully private — runs on your own runner)
+```yaml
+LLM_API_KEY: "ollama"   # any non-empty string; Ollama ignores it
+LLM_MODEL: "qwen2.5-coder:7b"
+LLM_BASE_URL: "http://localhost:11434/v1"
+```
+
+### GitHub Models (free for public repos)
+```yaml
+LLM_API_KEY: ${{ secrets.GITHUB_TOKEN }}
+LLM_MODEL: "gpt-4o-mini"
+LLM_BASE_URL: "https://models.inference.ai.azure.com"
+```
+
 ---
 
 ## Configuration
@@ -199,6 +217,9 @@ LLM_BASE_URL: "https://openrouter.ai/api/v1"
 | `LLM_REVIEWER_MODEL` | No | `LLM_MODEL` | Fast/cheap model for issue detection (Agent 1). Overrides `LLM_MODEL` for Agent 1 only. |
 | `LLM_FIXER_MODEL` | No | `LLM_MODEL` | Smarter model for explanation and fix generation (Agent 2). Overrides `LLM_MODEL` for Agent 2 only. |
 | `exclude` | No | - | Files to skip (glob patterns) |
+| `CONTEXT_LINES` | No | `2` | Unchanged lines kept around each `+`/`-` in the TOON diff. Lower = cheaper, higher = more context. Set `0` to drop all context. |
+| `ENABLE_CACHE` | No | `true` | Cache LLM responses by hash of (model, messages) for the duration of the job. Set `false` to disable. |
+| `SEMGREP_RULES` | No | - | Optional Semgrep rulesets (e.g. `p/security-audit,p/owasp-top-ten`). When set and `semgrep` is on PATH, findings are passed to Agent 1 as priors. |
 | `DISCORD_WEBHOOK_URL` | No | - | Posts a start message (commit/PR context) and a reply with reviewer results to Discord. |
 | `SLACK_BOT_TOKEN` | No | - | Slack bot token (`xoxb-...`) used for threaded messages via `chat.postMessage`. |
 | `SLACK_CHANNEL_ID` | No | - | Slack channel ID for bot-thread notifications. Used with `SLACK_BOT_TOKEN`. |
@@ -208,9 +229,38 @@ LLM_BASE_URL: "https://openrouter.ai/api/v1"
 
 ---
 
+## Token efficiency (benchmarked)
+
+Measured on a representative two-file diff (auth fix + util change):
+
+| Format | Chars | ~Tokens |
+|---|---|---|
+| Raw unified diff | 1,401 | ~351 |
+| Verbose per-chunk JSON | 2,055 | ~514 |
+| **Compact TOON (this action)** | **1,126** | **~282** |
+
+That's **~45% smaller than verbose JSON** and **~20% smaller than the raw unified diff** the model would otherwise see. Drop `CONTEXT_LINES` to `0` for further savings on huge PRs.
+
+## Semgrep pre-pass (optional)
+
+If you set `SEMGREP_RULES` and have `semgrep` installed on the runner, PRowl will:
+
+1. Run Semgrep against changed files with the rulesets you choose
+2. Pass the findings to Agent 1 as **priors** — Agent 1 still verifies and filters false positives
+3. Agent 2 explains and proposes a fix
+
+```yaml
+- run: pip install semgrep
+- uses: tusharshah21/ai-code-reviewer@main
+  with:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+    SEMGREP_RULES: "p/security-audit,p/owasp-top-ten"
+```
+
 ## Cost Comparison
 
-TOON encoding saves 50-70% tokens. Example for reviewing 1000 lines:
+Example for reviewing 1000 lines (with TOON + caching):
 
 | Provider | Model | Cost/Review |
 |----------|-------|-------------|

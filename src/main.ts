@@ -3,9 +3,10 @@ import * as core from "@actions/core";
 import { Octokit } from "@octokit/rest";
 import parseDiff, { Chunk, File } from "parse-diff";
 import minimatch from "minimatch";
-import { encodeDiffToTOON } from "./toon/encoder";
+import { encodeFilesToTOON } from "./toon/encoder";
 import { orchestrate, OrchestratorConfig } from "./orchestrator";
 import { Notifier } from "./notifications";
+import { runSemgrep, formatFindings } from "./static/semgrep";
 
 const GITHUB_TOKEN: string = core.getInput("GITHUB_TOKEN");
 const LLM_API_KEY: string = core.getInput("LLM_API_KEY");
@@ -17,6 +18,9 @@ const DISCORD_WEBHOOK_URL: string = core.getInput("DISCORD_WEBHOOK_URL");
 const SLACK_BOT_TOKEN: string = core.getInput("SLACK_BOT_TOKEN");
 const SLACK_CHANNEL_ID: string = core.getInput("SLACK_CHANNEL_ID");
 const SLACK_WEBHOOK_URL: string = core.getInput("SLACK_WEBHOOK_URL");
+const CONTEXT_LINES: number = parseInt(core.getInput("CONTEXT_LINES") || "2", 10);
+const ENABLE_CACHE: boolean = (core.getInput("ENABLE_CACHE") || "true").toLowerCase() !== "false";
+const SEMGREP_RULES: string = core.getInput("SEMGREP_RULES") || "";
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
@@ -72,26 +76,31 @@ async function analyzeCode(
 }> {
   const comments: Array<{ body: string; path: string; line: number }> = [];
 
-  // Build full TOON-encoded diff string for the orchestrator
-  const toonChunks: string[] = [];
-  for (const file of parsedDiff) {
-    if (file.to === "/dev/null") continue;
-    for (const chunk of file.chunks) {
-      toonChunks.push(encodeDiffToTOON(file, chunk));
-    }
-  }
+  const toonDiff = encodeFilesToTOON(parsedDiff, { contextLines: CONTEXT_LINES });
 
-  if (toonChunks.length === 0) {
+  if (toonDiff.length === 0) {
     return { comments, results: [] };
   }
 
-  const toonDiff = toonChunks.join("\n");
+  let semgrepFindings = "";
+  if (SEMGREP_RULES) {
+    const changedFiles = parsedDiff
+      .map((f) => f.to)
+      .filter((p): p is string => !!p && p !== "/dev/null");
+    const findings = runSemgrep(changedFiles, SEMGREP_RULES);
+    if (findings.length > 0) {
+      console.log(`[semgrep] ${findings.length} finding(s)`);
+      semgrepFindings = formatFindings(findings);
+    }
+  }
 
   const config: OrchestratorConfig = {
     reviewerModel: LLM_REVIEWER_MODEL,
     fixerModel: LLM_FIXER_MODEL,
     apiKey: LLM_API_KEY,
     baseURL: LLM_BASE_URL || undefined,
+    cache: ENABLE_CACHE,
+    semgrepFindings: semgrepFindings || undefined,
   };
 
   const results = await orchestrate(toonDiff, config);

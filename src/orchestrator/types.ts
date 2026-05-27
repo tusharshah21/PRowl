@@ -30,4 +30,6 @@ export interface OrchestratorConfig {
   fixerModel: string;
   apiKey: string;
   baseURL?: string;
+  cache?: boolean;
+  semgrepFindings?: string; // serialized findings to nudge Agent 1
 }

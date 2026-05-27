@@ -12,6 +12,7 @@
  */
 
 import OpenAI from "openai";
+import { cacheGet, cacheSet } from "./cache";
 
 export interface LLMConfig {
   model: string;      // Runtime string, user-provided
@@ -19,6 +20,7 @@ export interface LLMConfig {
   baseURL?: string;   // Optional: LiteLLM proxy, OpenRouter, etc.
   temperature?: number;
   maxTokens?: number;
+  cache?: boolean;    // Persist responses by hash(model,messages) under /tmp
 }
 
 export interface LLMMessage {
@@ -46,6 +48,15 @@ export async function callLLM(
   config: LLMConfig,
   messages: LLMMessage[]
 ): Promise<string | null> {
+  const useCache = config.cache !== false;
+  if (useCache) {
+    const hit = cacheGet(config, messages);
+    if (hit !== null) {
+      console.log(`[llm] cache hit (${config.model})`);
+      return hit;
+    }
+  }
+
   try {
     const client = new OpenAI({
       apiKey: config.apiKey,
@@ -59,7 +70,9 @@ export async function callLLM(
       max_tokens: config.maxTokens ?? 700,
     });
 
-    return response.choices[0]?.message?.content?.trim() || null;
+    const content = response.choices[0]?.message?.content?.trim() || null;
+    if (useCache && content) cacheSet(config, messages, content);
+    return content;
   } catch (error) {
     console.error("LLM API Error:", error);
     if (error instanceof Error) {

@@ -3,6 +3,13 @@ import { DetectedIssue, ReviewerResponse } from "./types";
 
 const REVIEWER_PROMPT = `You are a fast code-review triage agent. Scan the TOON-encoded diff and flag ONLY critical issues.
 
+TOON format:
+  F:<path>              file header
+  C[N]{op,ln,code}:     N change rows follow, fields = op, ln, code
+  <op>,<ln>,"<code>"    one row. op is "+" (added), "-" (removed), " " (context). ln is the line number. code is JSON-quoted.
+
+Focus on added ("+") lines; context (" ") is for understanding only — never flag it. Removed ("-") lines are gone, so flag only if their removal causes the bug.
+
 DETECT:
 - BUG: Logic errors, null/undefined risks, off-by-one, race conditions
 - SECURITY: Injection, XSS, hardcoded secrets, unsafe eval, SQL injection
@@ -12,7 +19,7 @@ DETECT:
 SKIP: Style, formatting, naming, comments, positive feedback.
 
 OUTPUT (strict JSON, nothing else):
-{"issues":[{"file":"<path>","line":<n>,"chunk":"<minimal code snippet>","issueType":"BUG|SECURITY|PERFORMANCE|BEST_PRACTICE"}]}
+{"issues":[{"file":"<path from F: header>","line":<ln from the row>,"chunk":"<the code field of the offending row>","issueType":"BUG|SECURITY|PERFORMANCE|BEST_PRACTICE"}]}
 
 If no issues: {"issues":[]}`;
 
@@ -28,11 +35,15 @@ function cleanJSON(raw: string): string {
 
 export async function runReviewerAgent(
   toonDiff: string,
-  config: LLMConfig
+  config: LLMConfig,
+  semgrepFindings?: string
 ): Promise<DetectedIssue[]> {
+  const userContent = semgrepFindings
+    ? `Static analyzer (Semgrep) flagged the following — treat as priors, verify before reporting:\n${semgrepFindings}\n\nDiff:\n${toonDiff}`
+    : toonDiff;
   const response = await callLLM(config, [
     { role: "system", content: REVIEWER_PROMPT },
-    { role: "user", content: toonDiff },
+    { role: "user", content: userContent },
   ]);
 
   if (!response) {

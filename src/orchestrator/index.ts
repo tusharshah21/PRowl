@@ -14,10 +14,11 @@ export async function orchestrate(
     baseURL: config.baseURL,
     temperature: 0.2,
     maxTokens: 700,
+    cache: config.cache,
   };
 
   console.log(`[orchestrator] Running reviewer agent with model: ${config.reviewerModel}`);
-  const issues = await runReviewerAgent(toonDiff, reviewerConfig);
+  const issues = await runReviewerAgent(toonDiff, reviewerConfig, config.semgrepFindings);
 
   if (issues.length === 0) {
     console.log("[orchestrator] No issues detected — skipping fixer agent");
@@ -32,6 +33,7 @@ export async function orchestrate(
     baseURL: config.baseURL,
     temperature: 0.2,
     maxTokens: 700,
+    cache: config.cache,
   };
 
   const fixResults = await Promise.all(
@@ -40,7 +42,8 @@ export async function orchestrate(
         issue.chunk,
         issue.issueType,
         issue.line,
-        fixerConfig
+        fixerConfig,
+        issue.file
       );
       if (!fix) return null;
       return {
