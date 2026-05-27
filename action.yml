@@ -1,5 +1,5 @@
-name: "PRowl"
-description: "The multi-agent PR reviewer that never misses a bug. Detects issues with a fast model, explains and fixes them with a smarter one. Works with any LLM provider."
+name: "PRowl Code Review"
+description: "Multi-agent AI PR reviewer — a fast model triages, a smarter one explains and fixes. Works with any LLM (BYOK)."
 inputs:
   GITHUB_TOKEN:
     description: "GitHub token to interact with the repository."
