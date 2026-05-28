@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1
+
+### Fixes
+- **Newer OpenAI models (`gpt-5`, `o`-series) now work.** They reject the legacy `max_tokens` parameter (and a custom `temperature`); the client previously always sent `max_tokens`, so the reviewer call 400'd and silently returned no issues. `callLLM` is now adaptive: it tries the standard params and, only on an "unsupported parameter" error, falls forward to `max_completion_tokens` (and drops `temperature`). The working shape is memoized per model. No model-name hardcoding, so OpenAI-compatible providers that expect `max_tokens` (Groq, DeepSeek, Ollama, etc.) are unaffected.
+
 ## 1.1.0
 
 ### Token efficiency

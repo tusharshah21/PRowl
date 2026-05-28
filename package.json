@@ -1,6 +1,6 @@
 {
   "name": "ai-codereviewer",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Multi-provider AI code reviews with TOON encoding (OpenAI, Anthropic, Google, Azure, etc.)",
   "main": "lib/main.js",
   "author": "",

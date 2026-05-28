@@ -35677,10 +35677,34 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.callLiteLLM = void 0;
 exports.callLLM = callLLM;
-const openai_1 = __importDefault(__nccwpck_require__(2643));
+const openai_1 = __importDefault(__nccwpck_require__(1450));
 const cache_1 = __nccwpck_require__(793);
 // Default to OpenAI, but users can override with any OpenAI-compatible endpoint
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
+const SHAPE_ORDER = ["legacy", "completion_temp", "completion_only"];
+const shapeMemo = new Map();
+function buildParams(shape, model, messages, maxTokens, temperature) {
+    const base = { model, messages };
+    if (shape === "legacy") {
+        base.max_tokens = maxTokens;
+        base.temperature = temperature;
+    }
+    else if (shape === "completion_temp") {
+        base.max_completion_tokens = maxTokens;
+        base.temperature = temperature;
+    }
+    else {
+        base.max_completion_tokens = maxTokens; // omit temperature → provider default
+    }
+    return base;
+}
+function isUnsupportedParamError(error) {
+    const e = error;
+    if (!e || e.status !== 400)
+        return false;
+    return (e.code === "unsupported_parameter" ||
+        /unsupported parameter|not supported with this model|max_completion_tokens/i.test(e.message || ""));
+}
 /**
  * Calls LLM using OpenAI-compatible API format.
  *
@@ -35696,7 +35720,7 @@ const DEFAULT_BASE_URL = "https://api.openai.com/v1";
  */
 function callLLM(config, messages) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c, _d, _e;
+        var _a, _b, _c, _d, _e, _f;
         const useCache = config.cache !== false;
         if (useCache) {
             const hit = (0, cache_1.cacheGet)(config, messages);
@@ -35705,29 +35729,38 @@ function callLLM(config, messages) {
                 return hit;
             }
         }
-        try {
-            const client = new openai_1.default({
-                apiKey: config.apiKey,
-                baseURL: config.baseURL || DEFAULT_BASE_URL,
-            });
-            const response = yield client.chat.completions.create({
-                model: config.model,
-                messages: messages,
-                temperature: (_a = config.temperature) !== null && _a !== void 0 ? _a : 0.2,
-                max_tokens: (_b = config.maxTokens) !== null && _b !== void 0 ? _b : 700,
-            });
-            const content = ((_e = (_d = (_c = response.choices[0]) === null || _c === void 0 ? void 0 : _c.message) === null || _d === void 0 ? void 0 : _d.content) === null || _e === void 0 ? void 0 : _e.trim()) || null;
-            if (useCache && content)
-                (0, cache_1.cacheSet)(config, messages, content);
-            return content;
-        }
-        catch (error) {
-            console.error("LLM API Error:", error);
-            if (error instanceof Error) {
-                console.error("Details:", error.message);
+        const client = new openai_1.default({
+            apiKey: config.apiKey,
+            baseURL: config.baseURL || DEFAULT_BASE_URL,
+        });
+        const temperature = (_a = config.temperature) !== null && _a !== void 0 ? _a : 0.2;
+        const maxTokens = (_b = config.maxTokens) !== null && _b !== void 0 ? _b : 700;
+        // Start from the shape that previously worked for this model, then fall
+        // forward through the remaining shapes on "unsupported parameter" errors.
+        const start = SHAPE_ORDER.indexOf((_c = shapeMemo.get(config.model)) !== null && _c !== void 0 ? _c : "legacy");
+        for (let i = Math.max(start, 0); i < SHAPE_ORDER.length; i++) {
+            const shape = SHAPE_ORDER[i];
+            try {
+                const response = yield client.chat.completions.create(buildParams(shape, config.model, messages, maxTokens, temperature));
+                shapeMemo.set(config.model, shape);
+                const content = ((_f = (_e = (_d = response.choices[0]) === null || _d === void 0 ? void 0 : _d.message) === null || _e === void 0 ? void 0 : _e.content) === null || _f === void 0 ? void 0 : _f.trim()) || null;
+                if (useCache && content)
+                    (0, cache_1.cacheSet)(config, messages, content);
+                return content;
             }
-            return null;
+            catch (error) {
+                if (isUnsupportedParamError(error) && i < SHAPE_ORDER.length - 1) {
+                    console.log(`[llm] '${shape}' params rejected by ${config.model}; retrying with '${SHAPE_ORDER[i + 1]}'`);
+                    continue;
+                }
+                console.error("LLM API Error:", error);
+                if (error instanceof Error) {
+                    console.error("Details:", error.message);
+                }
+                return null;
+            }
         }
+        return null;
     });
 }
 // Backward compatibility alias
@@ -41211,7 +41244,7 @@ exports.unescape = unescape;
 
 /***/ }),
 
-/***/ 7675:
+/***/ 767:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -41234,7 +41267,7 @@ exports.MultipartBody = MultipartBody;
 
 /***/ }),
 
-/***/ 754:
+/***/ 9015:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -41257,19 +41290,19 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 /**
  * Disclaimer: modules in _shims aren't intended to be imported by SDK users.
  */
-__exportStar(__nccwpck_require__(7071), exports);
+__exportStar(__nccwpck_require__(3141), exports);
 //# sourceMappingURL=runtime-node.js.map
 
 /***/ }),
 
-/***/ 2233:
+/***/ 4122:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 /**
  * Disclaimer: modules in _shims aren't intended to be imported by SDK users.
  */
-const shims = __nccwpck_require__(2039);
-const auto = __nccwpck_require__(754);
+const shims = __nccwpck_require__(8806);
+const auto = __nccwpck_require__(9015);
 exports.init = () => {
   if (!shims.kind) shims.setShims(auto.getRuntime(), { auto: true });
 };
@@ -41286,7 +41319,7 @@ exports.init();
 
 /***/ }),
 
-/***/ 7071:
+/***/ 3141:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -41329,7 +41362,7 @@ const abort_controller_1 = __nccwpck_require__(8209);
 const node_fs_1 = __nccwpck_require__(7561);
 const form_data_encoder_1 = __nccwpck_require__(6331);
 const node_stream_1 = __nccwpck_require__(4492);
-const MultipartBody_1 = __nccwpck_require__(7675);
+const MultipartBody_1 = __nccwpck_require__(767);
 const web_1 = __nccwpck_require__(2477);
 let fileFromPathWarned = false;
 async function fileFromPath(path, ...args) {
@@ -41382,7 +41415,7 @@ exports.getRuntime = getRuntime;
 
 /***/ }),
 
-/***/ 2039:
+/***/ 8806:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -41430,7 +41463,7 @@ exports.setShims = setShims;
 
 /***/ }),
 
-/***/ 4533:
+/***/ 7179:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -41683,7 +41716,7 @@ exports.partialParse = partialParse;
 
 /***/ }),
 
-/***/ 233:
+/***/ 8103:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -41702,14 +41735,14 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 var _AbstractPage_client;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.isObj = exports.toFloat32Array = exports.toBase64 = exports.getHeader = exports.getRequiredHeader = exports.isHeadersProtocol = exports.isRunningInBrowser = exports.debug = exports.hasOwn = exports.isEmptyObj = exports.maybeCoerceBoolean = exports.maybeCoerceFloat = exports.maybeCoerceInteger = exports.coerceBoolean = exports.coerceFloat = exports.coerceInteger = exports.readEnv = exports.ensurePresent = exports.castToError = exports.sleep = exports.safeJSON = exports.isRequestOptions = exports.createResponseHeaders = exports.PagePromise = exports.AbstractPage = exports.APIClient = exports.APIPromise = exports.createForm = exports.multipartFormRequestOptions = exports.maybeMultipartFormRequestOptions = void 0;
-const version_1 = __nccwpck_require__(6140);
-const streaming_1 = __nccwpck_require__(6642);
-const error_1 = __nccwpck_require__(872);
-const index_1 = __nccwpck_require__(2233);
+const version_1 = __nccwpck_require__(2649);
+const streaming_1 = __nccwpck_require__(7578);
+const error_1 = __nccwpck_require__(3890);
+const index_1 = __nccwpck_require__(4122);
 // try running side effects outside of _shims/index to workaround https://github.com/vercel/next.js/issues/76881
 (0, index_1.init)();
-const uploads_1 = __nccwpck_require__(8173);
-var uploads_2 = __nccwpck_require__(8173);
+const uploads_1 = __nccwpck_require__(9820);
+var uploads_2 = __nccwpck_require__(9820);
 Object.defineProperty(exports, "maybeMultipartFormRequestOptions", ({ enumerable: true, get: function () { return uploads_2.maybeMultipartFormRequestOptions; } }));
 Object.defineProperty(exports, "multipartFormRequestOptions", ({ enumerable: true, get: function () { return uploads_2.multipartFormRequestOptions; } }));
 Object.defineProperty(exports, "createForm", ({ enumerable: true, get: function () { return uploads_2.createForm; } }));
@@ -42680,7 +42713,7 @@ exports.isObj = isObj;
 
 /***/ }),
 
-/***/ 872:
+/***/ 3890:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -42688,7 +42721,7 @@ exports.isObj = isObj;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ContentFilterFinishReasonError = exports.LengthFinishReasonError = exports.InternalServerError = exports.RateLimitError = exports.UnprocessableEntityError = exports.ConflictError = exports.NotFoundError = exports.PermissionDeniedError = exports.AuthenticationError = exports.BadRequestError = exports.APIConnectionTimeoutError = exports.APIConnectionError = exports.APIUserAbortError = exports.APIError = exports.OpenAIError = void 0;
-const core_1 = __nccwpck_require__(233);
+const core_1 = __nccwpck_require__(8103);
 class OpenAIError extends Error {
 }
 exports.OpenAIError = OpenAIError;
@@ -42817,7 +42850,7 @@ exports.ContentFilterFinishReasonError = ContentFilterFinishReasonError;
 
 /***/ }),
 
-/***/ 2643:
+/***/ 1450:
 /***/ (function(module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -42849,30 +42882,30 @@ var __importStar = (this && this.__importStar) || function (mod) {
 var _a;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.UnprocessableEntityError = exports.PermissionDeniedError = exports.InternalServerError = exports.AuthenticationError = exports.BadRequestError = exports.RateLimitError = exports.ConflictError = exports.NotFoundError = exports.APIUserAbortError = exports.APIConnectionTimeoutError = exports.APIConnectionError = exports.APIError = exports.OpenAIError = exports.fileFromPath = exports.toFile = exports.AzureOpenAI = exports.OpenAI = void 0;
-const qs = __importStar(__nccwpck_require__(1594));
-const Core = __importStar(__nccwpck_require__(233));
-const Errors = __importStar(__nccwpck_require__(872));
-const Pagination = __importStar(__nccwpck_require__(1694));
-const Uploads = __importStar(__nccwpck_require__(8173));
-const API = __importStar(__nccwpck_require__(2013));
-const batches_1 = __nccwpck_require__(9504);
-const completions_1 = __nccwpck_require__(9569);
-const embeddings_1 = __nccwpck_require__(1318);
-const files_1 = __nccwpck_require__(446);
-const images_1 = __nccwpck_require__(9393);
-const models_1 = __nccwpck_require__(7382);
-const moderations_1 = __nccwpck_require__(9541);
-const audio_1 = __nccwpck_require__(3897);
-const beta_1 = __nccwpck_require__(1631);
-const chat_1 = __nccwpck_require__(8790);
-const containers_1 = __nccwpck_require__(4397);
-const evals_1 = __nccwpck_require__(3585);
-const fine_tuning_1 = __nccwpck_require__(819);
-const graders_1 = __nccwpck_require__(7250);
-const responses_1 = __nccwpck_require__(8159);
-const uploads_1 = __nccwpck_require__(6012);
-const vector_stores_1 = __nccwpck_require__(9266);
-const completions_2 = __nccwpck_require__(6993);
+const qs = __importStar(__nccwpck_require__(6285));
+const Core = __importStar(__nccwpck_require__(8103));
+const Errors = __importStar(__nccwpck_require__(3890));
+const Pagination = __importStar(__nccwpck_require__(9764));
+const Uploads = __importStar(__nccwpck_require__(9820));
+const API = __importStar(__nccwpck_require__(1543));
+const batches_1 = __nccwpck_require__(6972);
+const completions_1 = __nccwpck_require__(786);
+const embeddings_1 = __nccwpck_require__(5977);
+const files_1 = __nccwpck_require__(2365);
+const images_1 = __nccwpck_require__(2833);
+const models_1 = __nccwpck_require__(9529);
+const moderations_1 = __nccwpck_require__(7361);
+const audio_1 = __nccwpck_require__(6541);
+const beta_1 = __nccwpck_require__(2526);
+const chat_1 = __nccwpck_require__(4649);
+const containers_1 = __nccwpck_require__(9035);
+const evals_1 = __nccwpck_require__(4708);
+const fine_tuning_1 = __nccwpck_require__(4776);
+const graders_1 = __nccwpck_require__(8301);
+const responses_1 = __nccwpck_require__(1705);
+const uploads_1 = __nccwpck_require__(3255);
+const vector_stores_1 = __nccwpck_require__(5998);
+const completions_2 = __nccwpck_require__(7377);
 /**
  * API Client for interfacing with the OpenAI API.
  */
@@ -43119,10 +43152,10 @@ const _deployments_endpoints = new Set([
 ]);
 const API_KEY_SENTINEL = '<Missing Key>';
 // ---------------------- End Azure ----------------------
-var uploads_2 = __nccwpck_require__(8173);
+var uploads_2 = __nccwpck_require__(9820);
 Object.defineProperty(exports, "toFile", ({ enumerable: true, get: function () { return uploads_2.toFile; } }));
 Object.defineProperty(exports, "fileFromPath", ({ enumerable: true, get: function () { return uploads_2.fileFromPath; } }));
-var error_1 = __nccwpck_require__(872);
+var error_1 = __nccwpck_require__(3890);
 Object.defineProperty(exports, "OpenAIError", ({ enumerable: true, get: function () { return error_1.OpenAIError; } }));
 Object.defineProperty(exports, "APIError", ({ enumerable: true, get: function () { return error_1.APIError; } }));
 Object.defineProperty(exports, "APIConnectionError", ({ enumerable: true, get: function () { return error_1.APIConnectionError; } }));
@@ -43143,7 +43176,7 @@ exports["default"] = OpenAI;
 
 /***/ }),
 
-/***/ 7506:
+/***/ 1438:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -43162,7 +43195,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 var _LineDecoder_carriageReturnIndex;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.findDoubleNewlineIndex = exports.LineDecoder = void 0;
-const error_1 = __nccwpck_require__(872);
+const error_1 = __nccwpck_require__(3890);
 /**
  * A re-implementation of httpx's `LineDecoder` in Python that handles incrementally
  * reading lines from text.
@@ -43300,7 +43333,7 @@ exports.findDoubleNewlineIndex = findDoubleNewlineIndex;
 
 /***/ }),
 
-/***/ 6054:
+/***/ 4202:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -43318,14 +43351,14 @@ exports.RFC3986 = 'RFC3986';
 
 /***/ }),
 
-/***/ 1594:
+/***/ 6285:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.formats = exports.stringify = void 0;
-const formats_1 = __nccwpck_require__(6054);
+const formats_1 = __nccwpck_require__(4202);
 const formats = {
     formatters: formats_1.formatters,
     RFC1738: formats_1.RFC1738,
@@ -43333,21 +43366,21 @@ const formats = {
     default: formats_1.default_format,
 };
 exports.formats = formats;
-var stringify_1 = __nccwpck_require__(6185);
+var stringify_1 = __nccwpck_require__(4144);
 Object.defineProperty(exports, "stringify", ({ enumerable: true, get: function () { return stringify_1.stringify; } }));
 //# sourceMappingURL=index.js.map
 
 /***/ }),
 
-/***/ 6185:
+/***/ 4144:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.stringify = void 0;
-const utils_1 = __nccwpck_require__(4666);
-const formats_1 = __nccwpck_require__(6054);
+const utils_1 = __nccwpck_require__(380);
+const formats_1 = __nccwpck_require__(4202);
 const has = Object.prototype.hasOwnProperty;
 const array_prefix_generators = {
     brackets(prefix) {
@@ -43626,14 +43659,14 @@ exports.stringify = stringify;
 
 /***/ }),
 
-/***/ 4666:
+/***/ 380:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.maybe_map = exports.combine = exports.is_buffer = exports.is_regexp = exports.compact = exports.encode = exports.decode = exports.assign_single_source = exports.merge = void 0;
-const formats_1 = __nccwpck_require__(6054);
+const formats_1 = __nccwpck_require__(4202);
 const has = Object.prototype.hasOwnProperty;
 const is_array = Array.isArray;
 const hex_table = (() => {
@@ -43862,7 +43895,7 @@ exports.maybe_map = maybe_map;
 
 /***/ }),
 
-/***/ 8275:
+/***/ 3552:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -43908,7 +43941,7 @@ exports.ReadableStreamToAsyncIterable = ReadableStreamToAsyncIterable;
 
 /***/ }),
 
-/***/ 6215:
+/***/ 6982:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -43921,11 +43954,11 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 var _AbstractChatCompletionRunner_instances, _AbstractChatCompletionRunner_getFinalContent, _AbstractChatCompletionRunner_getFinalMessage, _AbstractChatCompletionRunner_getFinalFunctionCall, _AbstractChatCompletionRunner_getFinalFunctionCallResult, _AbstractChatCompletionRunner_calculateTotalUsage, _AbstractChatCompletionRunner_validateParams, _AbstractChatCompletionRunner_stringifyFunctionCallResult;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AbstractChatCompletionRunner = void 0;
-const error_1 = __nccwpck_require__(872);
-const RunnableFunction_1 = __nccwpck_require__(8991);
-const chatCompletionUtils_1 = __nccwpck_require__(4758);
-const EventStream_1 = __nccwpck_require__(9179);
-const parser_1 = __nccwpck_require__(7862);
+const error_1 = __nccwpck_require__(3890);
+const RunnableFunction_1 = __nccwpck_require__(8929);
+const chatCompletionUtils_1 = __nccwpck_require__(3016);
+const EventStream_1 = __nccwpck_require__(3621);
+const parser_1 = __nccwpck_require__(2154);
 const DEFAULT_MAX_CHAT_COMPLETIONS = 10;
 class AbstractChatCompletionRunner extends EventStream_1.EventStream {
     constructor() {
@@ -44287,7 +44320,7 @@ _AbstractChatCompletionRunner_instances = new WeakSet(), _AbstractChatCompletion
 
 /***/ }),
 
-/***/ 4767:
+/***/ 4549:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -44329,10 +44362,10 @@ var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (
 var _AssistantStream_instances, _AssistantStream_events, _AssistantStream_runStepSnapshots, _AssistantStream_messageSnapshots, _AssistantStream_messageSnapshot, _AssistantStream_finalRun, _AssistantStream_currentContentIndex, _AssistantStream_currentContent, _AssistantStream_currentToolCallIndex, _AssistantStream_currentToolCall, _AssistantStream_currentEvent, _AssistantStream_currentRunSnapshot, _AssistantStream_currentRunStepSnapshot, _AssistantStream_addEvent, _AssistantStream_endRequest, _AssistantStream_handleMessage, _AssistantStream_handleRunStep, _AssistantStream_handleEvent, _AssistantStream_accumulateRunStep, _AssistantStream_accumulateMessage, _AssistantStream_accumulateContent, _AssistantStream_handleRun;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AssistantStream = void 0;
-const Core = __importStar(__nccwpck_require__(233));
-const streaming_1 = __nccwpck_require__(6642);
-const error_1 = __nccwpck_require__(872);
-const EventStream_1 = __nccwpck_require__(9179);
+const Core = __importStar(__nccwpck_require__(8103));
+const streaming_1 = __nccwpck_require__(7578);
+const error_1 = __nccwpck_require__(3890);
+const EventStream_1 = __nccwpck_require__(3621);
 class AssistantStream extends EventStream_1.EventStream {
     constructor() {
         super(...arguments);
@@ -44879,15 +44912,15 @@ function assertNever(_x) { }
 
 /***/ }),
 
-/***/ 5476:
+/***/ 6539:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ChatCompletionRunner = void 0;
-const AbstractChatCompletionRunner_1 = __nccwpck_require__(6215);
-const chatCompletionUtils_1 = __nccwpck_require__(4758);
+const AbstractChatCompletionRunner_1 = __nccwpck_require__(6982);
+const chatCompletionUtils_1 = __nccwpck_require__(3016);
 class ChatCompletionRunner extends AbstractChatCompletionRunner_1.AbstractChatCompletionRunner {
     /** @deprecated - please use `runTools` instead. */
     static runFunctions(client, params, options) {
@@ -44920,7 +44953,7 @@ exports.ChatCompletionRunner = ChatCompletionRunner;
 
 /***/ }),
 
-/***/ 4658:
+/***/ 9335:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -44939,11 +44972,11 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 var _ChatCompletionStream_instances, _ChatCompletionStream_params, _ChatCompletionStream_choiceEventStates, _ChatCompletionStream_currentChatCompletionSnapshot, _ChatCompletionStream_beginRequest, _ChatCompletionStream_getChoiceEventState, _ChatCompletionStream_addChunk, _ChatCompletionStream_emitToolCallDoneEvent, _ChatCompletionStream_emitContentDoneEvents, _ChatCompletionStream_endRequest, _ChatCompletionStream_getAutoParseableResponseFormat, _ChatCompletionStream_accumulateChatCompletion;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ChatCompletionStream = void 0;
-const error_1 = __nccwpck_require__(872);
-const AbstractChatCompletionRunner_1 = __nccwpck_require__(6215);
-const streaming_1 = __nccwpck_require__(6642);
-const parser_1 = __nccwpck_require__(7862);
-const parser_2 = __nccwpck_require__(4533);
+const error_1 = __nccwpck_require__(3890);
+const AbstractChatCompletionRunner_1 = __nccwpck_require__(6982);
+const streaming_1 = __nccwpck_require__(7578);
+const parser_1 = __nccwpck_require__(2154);
+const parser_2 = __nccwpck_require__(7179);
 class ChatCompletionStream extends AbstractChatCompletionRunner_1.AbstractChatCompletionRunner {
     constructor(params) {
         super();
@@ -45430,14 +45463,14 @@ function assertNever(_x) { }
 
 /***/ }),
 
-/***/ 8633:
+/***/ 8143:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ChatCompletionStreamingRunner = void 0;
-const ChatCompletionStream_1 = __nccwpck_require__(4658);
+const ChatCompletionStream_1 = __nccwpck_require__(9335);
 class ChatCompletionStreamingRunner extends ChatCompletionStream_1.ChatCompletionStream {
     static fromReadableStream(stream) {
         const runner = new ChatCompletionStreamingRunner(null);
@@ -45471,7 +45504,7 @@ exports.ChatCompletionStreamingRunner = ChatCompletionStreamingRunner;
 
 /***/ }),
 
-/***/ 9179:
+/***/ 3621:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -45490,7 +45523,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 var _EventStream_instances, _EventStream_connectedPromise, _EventStream_resolveConnectedPromise, _EventStream_rejectConnectedPromise, _EventStream_endPromise, _EventStream_resolveEndPromise, _EventStream_rejectEndPromise, _EventStream_listeners, _EventStream_ended, _EventStream_errored, _EventStream_aborted, _EventStream_catchingPromiseCreated, _EventStream_handleError;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.EventStream = void 0;
-const error_1 = __nccwpck_require__(872);
+const error_1 = __nccwpck_require__(3890);
 class EventStream {
     constructor() {
         _EventStream_instances.add(this);
@@ -45678,15 +45711,15 @@ _EventStream_connectedPromise = new WeakMap(), _EventStream_resolveConnectedProm
 
 /***/ }),
 
-/***/ 5872:
+/***/ 3480:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.addOutputText = exports.validateInputTools = exports.shouldParseToolCall = exports.isAutoParsableTool = exports.makeParseableResponseTool = exports.hasAutoParseableInput = exports.parseResponse = exports.maybeParseResponse = void 0;
-const error_1 = __nccwpck_require__(872);
-const parser_1 = __nccwpck_require__(7862);
+const error_1 = __nccwpck_require__(3890);
+const parser_1 = __nccwpck_require__(2154);
 function maybeParseResponse(response, params) {
     if (!params || !hasAutoParseableInput(params)) {
         return {
@@ -45856,7 +45889,7 @@ exports.addOutputText = addOutputText;
 
 /***/ }),
 
-/***/ 8991:
+/***/ 8929:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -45898,7 +45931,7 @@ exports.ParsingToolFunction = ParsingToolFunction;
 
 /***/ }),
 
-/***/ 9231:
+/***/ 9028:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -45931,7 +45964,7 @@ exports.allSettledWithThrow = allSettledWithThrow;
 
 /***/ }),
 
-/***/ 4758:
+/***/ 3016:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -45958,14 +45991,14 @@ exports.isPresent = isPresent;
 
 /***/ }),
 
-/***/ 7862:
+/***/ 2154:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.validateInputTools = exports.hasAutoParseableInput = exports.shouldParseToolCall = exports.parseChatCompletion = exports.maybeParseChatCompletion = exports.isAutoParsableTool = exports.makeParseableTool = exports.isAutoParsableResponseFormat = exports.makeParseableTextFormat = exports.makeParseableResponseFormat = void 0;
-const error_1 = __nccwpck_require__(872);
+const error_1 = __nccwpck_require__(3890);
 function makeParseableResponseFormat(response_format, parser) {
     const obj = { ...response_format };
     Object.defineProperties(obj, {
@@ -46125,7 +46158,7 @@ exports.validateInputTools = validateInputTools;
 
 /***/ }),
 
-/***/ 8319:
+/***/ 9334:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -46144,9 +46177,9 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 var _ResponseStream_instances, _ResponseStream_params, _ResponseStream_currentResponseSnapshot, _ResponseStream_finalResponse, _ResponseStream_beginRequest, _ResponseStream_addEvent, _ResponseStream_endRequest, _ResponseStream_accumulateResponse;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ResponseStream = void 0;
-const error_1 = __nccwpck_require__(872);
-const EventStream_1 = __nccwpck_require__(9179);
-const ResponsesParser_1 = __nccwpck_require__(5872);
+const error_1 = __nccwpck_require__(3890);
+const EventStream_1 = __nccwpck_require__(3621);
+const ResponsesParser_1 = __nccwpck_require__(3480);
 class ResponseStream extends EventStream_1.EventStream {
     constructor(params) {
         super();
@@ -46382,7 +46415,7 @@ function finalizeResponse(snapshot, params) {
 
 /***/ }),
 
-/***/ 1694:
+/***/ 9764:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -46390,7 +46423,7 @@ function finalizeResponse(snapshot, params) {
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CursorPage = exports.Page = void 0;
-const core_1 = __nccwpck_require__(233);
+const core_1 = __nccwpck_require__(8103);
 /**
  * Note: no pagination actually occurs yet, this is for forwards-compatibility.
  */
@@ -46460,7 +46493,7 @@ exports.CursorPage = CursorPage;
 
 /***/ }),
 
-/***/ 9293:
+/***/ 3464:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -46478,7 +46511,7 @@ exports.APIResource = APIResource;
 
 /***/ }),
 
-/***/ 3897:
+/***/ 6541:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -46509,13 +46542,13 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Audio = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const SpeechAPI = __importStar(__nccwpck_require__(5341));
-const speech_1 = __nccwpck_require__(5341);
-const TranscriptionsAPI = __importStar(__nccwpck_require__(3144));
-const transcriptions_1 = __nccwpck_require__(3144);
-const TranslationsAPI = __importStar(__nccwpck_require__(2342));
-const translations_1 = __nccwpck_require__(2342);
+const resource_1 = __nccwpck_require__(3464);
+const SpeechAPI = __importStar(__nccwpck_require__(6394));
+const speech_1 = __nccwpck_require__(6394);
+const TranscriptionsAPI = __importStar(__nccwpck_require__(8612));
+const transcriptions_1 = __nccwpck_require__(8612);
+const TranslationsAPI = __importStar(__nccwpck_require__(2654));
+const translations_1 = __nccwpck_require__(2654);
 class Audio extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -46532,7 +46565,7 @@ Audio.Speech = speech_1.Speech;
 
 /***/ }),
 
-/***/ 5341:
+/***/ 6394:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -46540,7 +46573,7 @@ Audio.Speech = speech_1.Speech;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Speech = void 0;
-const resource_1 = __nccwpck_require__(9293);
+const resource_1 = __nccwpck_require__(3464);
 class Speech extends resource_1.APIResource {
     /**
      * Generates audio from the input text.
@@ -46571,7 +46604,7 @@ exports.Speech = Speech;
 
 /***/ }),
 
-/***/ 3144:
+/***/ 8612:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -46602,8 +46635,8 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Transcriptions = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const Core = __importStar(__nccwpck_require__(233));
+const resource_1 = __nccwpck_require__(3464);
+const Core = __importStar(__nccwpck_require__(8103));
 class Transcriptions extends resource_1.APIResource {
     create(body, options) {
         return this._client.post('/audio/transcriptions', Core.multipartFormRequestOptions({
@@ -46619,7 +46652,7 @@ exports.Transcriptions = Transcriptions;
 
 /***/ }),
 
-/***/ 2342:
+/***/ 2654:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -46650,8 +46683,8 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Translations = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const Core = __importStar(__nccwpck_require__(233));
+const resource_1 = __nccwpck_require__(3464);
+const Core = __importStar(__nccwpck_require__(8103));
 class Translations extends resource_1.APIResource {
     create(body, options) {
         return this._client.post('/audio/translations', Core.multipartFormRequestOptions({ body, ...options, __metadata: { model: body.model } }));
@@ -46662,7 +46695,7 @@ exports.Translations = Translations;
 
 /***/ }),
 
-/***/ 9504:
+/***/ 6972:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -46670,9 +46703,9 @@ exports.Translations = Translations;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.BatchesPage = exports.Batches = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const pagination_1 = __nccwpck_require__(9764);
 class Batches extends resource_1.APIResource {
     /**
      * Creates and executes a batch from an uploaded file of requests
@@ -46710,7 +46743,7 @@ Batches.BatchesPage = BatchesPage;
 
 /***/ }),
 
-/***/ 4713:
+/***/ 2465:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -46718,10 +46751,10 @@ Batches.BatchesPage = BatchesPage;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AssistantsPage = exports.Assistants = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const pagination_1 = __nccwpck_require__(1694);
-const AssistantStream_1 = __nccwpck_require__(4767);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const pagination_1 = __nccwpck_require__(9764);
+const AssistantStream_1 = __nccwpck_require__(4549);
 class Assistants extends resource_1.APIResource {
     /**
      * Create an assistant with a model and instructions.
@@ -46809,7 +46842,7 @@ Assistants.AssistantsPage = AssistantsPage;
 
 /***/ }),
 
-/***/ 1631:
+/***/ 2526:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -46840,15 +46873,15 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Beta = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const AssistantsAPI = __importStar(__nccwpck_require__(4713));
-const ChatAPI = __importStar(__nccwpck_require__(3534));
-const assistants_1 = __nccwpck_require__(4713);
-const RealtimeAPI = __importStar(__nccwpck_require__(8038));
-const realtime_1 = __nccwpck_require__(8038);
-const ThreadsAPI = __importStar(__nccwpck_require__(7984));
-const threads_1 = __nccwpck_require__(7984);
-const chat_1 = __nccwpck_require__(3534);
+const resource_1 = __nccwpck_require__(3464);
+const AssistantsAPI = __importStar(__nccwpck_require__(2465));
+const ChatAPI = __importStar(__nccwpck_require__(8016));
+const assistants_1 = __nccwpck_require__(2465);
+const RealtimeAPI = __importStar(__nccwpck_require__(5495));
+const realtime_1 = __nccwpck_require__(5495);
+const ThreadsAPI = __importStar(__nccwpck_require__(3509));
+const threads_1 = __nccwpck_require__(3509);
+const chat_1 = __nccwpck_require__(8016);
 class Beta extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -46867,7 +46900,7 @@ Beta.Threads = threads_1.Threads;
 
 /***/ }),
 
-/***/ 3534:
+/***/ 8016:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -46898,8 +46931,8 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Chat = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const CompletionsAPI = __importStar(__nccwpck_require__(2005));
+const resource_1 = __nccwpck_require__(3464);
+const CompletionsAPI = __importStar(__nccwpck_require__(960));
 class Chat extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -46914,7 +46947,7 @@ exports.Chat = Chat;
 
 /***/ }),
 
-/***/ 2005:
+/***/ 960:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -46922,19 +46955,19 @@ exports.Chat = Chat;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Completions = exports.ChatCompletionRunner = exports.ChatCompletionStream = exports.ParsingToolFunction = exports.ParsingFunction = exports.ChatCompletionStreamingRunner = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const ChatCompletionRunner_1 = __nccwpck_require__(5476);
-const ChatCompletionStreamingRunner_1 = __nccwpck_require__(8633);
-const ChatCompletionStream_1 = __nccwpck_require__(4658);
-const parser_1 = __nccwpck_require__(7862);
-var ChatCompletionStreamingRunner_2 = __nccwpck_require__(8633);
+const resource_1 = __nccwpck_require__(3464);
+const ChatCompletionRunner_1 = __nccwpck_require__(6539);
+const ChatCompletionStreamingRunner_1 = __nccwpck_require__(8143);
+const ChatCompletionStream_1 = __nccwpck_require__(9335);
+const parser_1 = __nccwpck_require__(2154);
+var ChatCompletionStreamingRunner_2 = __nccwpck_require__(8143);
 Object.defineProperty(exports, "ChatCompletionStreamingRunner", ({ enumerable: true, get: function () { return ChatCompletionStreamingRunner_2.ChatCompletionStreamingRunner; } }));
-var RunnableFunction_1 = __nccwpck_require__(8991);
+var RunnableFunction_1 = __nccwpck_require__(8929);
 Object.defineProperty(exports, "ParsingFunction", ({ enumerable: true, get: function () { return RunnableFunction_1.ParsingFunction; } }));
 Object.defineProperty(exports, "ParsingToolFunction", ({ enumerable: true, get: function () { return RunnableFunction_1.ParsingToolFunction; } }));
-var ChatCompletionStream_2 = __nccwpck_require__(4658);
+var ChatCompletionStream_2 = __nccwpck_require__(9335);
 Object.defineProperty(exports, "ChatCompletionStream", ({ enumerable: true, get: function () { return ChatCompletionStream_2.ChatCompletionStream; } }));
-var ChatCompletionRunner_2 = __nccwpck_require__(5476);
+var ChatCompletionRunner_2 = __nccwpck_require__(6539);
 Object.defineProperty(exports, "ChatCompletionRunner", ({ enumerable: true, get: function () { return ChatCompletionRunner_2.ChatCompletionRunner; } }));
 class Completions extends resource_1.APIResource {
     parse(body, options) {
@@ -46973,7 +47006,7 @@ exports.Completions = Completions;
 
 /***/ }),
 
-/***/ 8038:
+/***/ 5495:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -47004,11 +47037,11 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Realtime = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const SessionsAPI = __importStar(__nccwpck_require__(868));
-const sessions_1 = __nccwpck_require__(868);
-const TranscriptionSessionsAPI = __importStar(__nccwpck_require__(9074));
-const transcription_sessions_1 = __nccwpck_require__(9074);
+const resource_1 = __nccwpck_require__(3464);
+const SessionsAPI = __importStar(__nccwpck_require__(3420));
+const sessions_1 = __nccwpck_require__(3420);
+const TranscriptionSessionsAPI = __importStar(__nccwpck_require__(4354));
+const transcription_sessions_1 = __nccwpck_require__(4354);
 class Realtime extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -47023,7 +47056,7 @@ Realtime.TranscriptionSessions = transcription_sessions_1.TranscriptionSessions;
 
 /***/ }),
 
-/***/ 868:
+/***/ 3420:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -47031,7 +47064,7 @@ Realtime.TranscriptionSessions = transcription_sessions_1.TranscriptionSessions;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Sessions = void 0;
-const resource_1 = __nccwpck_require__(9293);
+const resource_1 = __nccwpck_require__(3464);
 class Sessions extends resource_1.APIResource {
     /**
      * Create an ephemeral API token for use in client-side applications with the
@@ -47061,7 +47094,7 @@ exports.Sessions = Sessions;
 
 /***/ }),
 
-/***/ 9074:
+/***/ 4354:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -47069,7 +47102,7 @@ exports.Sessions = Sessions;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.TranscriptionSessions = void 0;
-const resource_1 = __nccwpck_require__(9293);
+const resource_1 = __nccwpck_require__(3464);
 class TranscriptionSessions extends resource_1.APIResource {
     /**
      * Create an ephemeral API token for use in client-side applications with the
@@ -47099,7 +47132,7 @@ exports.TranscriptionSessions = TranscriptionSessions;
 
 /***/ }),
 
-/***/ 927:
+/***/ 3643:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -47107,9 +47140,9 @@ exports.TranscriptionSessions = TranscriptionSessions;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.MessagesPage = exports.Messages = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const pagination_1 = __nccwpck_require__(9764);
 /**
  * @deprecated The Assistants API is deprecated in favor of the Responses API
  */
@@ -47180,7 +47213,7 @@ Messages.MessagesPage = MessagesPage;
 
 /***/ }),
 
-/***/ 9529:
+/***/ 5376:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -47211,13 +47244,13 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.RunsPage = exports.Runs = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const AssistantStream_1 = __nccwpck_require__(4767);
-const core_2 = __nccwpck_require__(233);
-const StepsAPI = __importStar(__nccwpck_require__(3266));
-const steps_1 = __nccwpck_require__(3266);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const AssistantStream_1 = __nccwpck_require__(4549);
+const core_2 = __nccwpck_require__(8103);
+const StepsAPI = __importStar(__nccwpck_require__(2559));
+const steps_1 = __nccwpck_require__(2559);
+const pagination_1 = __nccwpck_require__(9764);
 /**
  * @deprecated The Assistants API is deprecated in favor of the Responses API
  */
@@ -47386,7 +47419,7 @@ Runs.RunStepsPage = steps_1.RunStepsPage;
 
 /***/ }),
 
-/***/ 3266:
+/***/ 2559:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -47394,9 +47427,9 @@ Runs.RunStepsPage = steps_1.RunStepsPage;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.RunStepsPage = exports.Steps = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const pagination_1 = __nccwpck_require__(9764);
 /**
  * @deprecated The Assistants API is deprecated in favor of the Responses API
  */
@@ -47431,7 +47464,7 @@ Steps.RunStepsPage = RunStepsPage;
 
 /***/ }),
 
-/***/ 7984:
+/***/ 3509:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -47462,13 +47495,13 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Threads = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const AssistantStream_1 = __nccwpck_require__(4767);
-const MessagesAPI = __importStar(__nccwpck_require__(927));
-const messages_1 = __nccwpck_require__(927);
-const RunsAPI = __importStar(__nccwpck_require__(9529));
-const runs_1 = __nccwpck_require__(9529);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const AssistantStream_1 = __nccwpck_require__(4549);
+const MessagesAPI = __importStar(__nccwpck_require__(3643));
+const messages_1 = __nccwpck_require__(3643);
+const RunsAPI = __importStar(__nccwpck_require__(5376));
+const runs_1 = __nccwpck_require__(5376);
 /**
  * @deprecated The Assistants API is deprecated in favor of the Responses API
  */
@@ -47555,7 +47588,7 @@ Threads.MessagesPage = messages_1.MessagesPage;
 
 /***/ }),
 
-/***/ 8790:
+/***/ 4649:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -47586,9 +47619,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Chat = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const CompletionsAPI = __importStar(__nccwpck_require__(6993));
-const completions_1 = __nccwpck_require__(6993);
+const resource_1 = __nccwpck_require__(3464);
+const CompletionsAPI = __importStar(__nccwpck_require__(7377));
+const completions_1 = __nccwpck_require__(7377);
 class Chat extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -47602,7 +47635,7 @@ Chat.ChatCompletionsPage = completions_1.ChatCompletionsPage;
 
 /***/ }),
 
-/***/ 6993:
+/***/ 7377:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -47633,11 +47666,11 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ChatCompletionStoreMessagesPage = exports.ChatCompletionsPage = exports.Completions = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const MessagesAPI = __importStar(__nccwpck_require__(1992));
-const messages_1 = __nccwpck_require__(1992);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const MessagesAPI = __importStar(__nccwpck_require__(6532));
+const messages_1 = __nccwpck_require__(6532);
+const pagination_1 = __nccwpck_require__(9764);
 class Completions extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -47708,7 +47741,7 @@ Completions.Messages = messages_1.Messages;
 
 /***/ }),
 
-/***/ 2062:
+/***/ 8921:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -47716,17 +47749,17 @@ Completions.Messages = messages_1.Messages;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Messages = exports.Completions = exports.ChatCompletionsPage = exports.ChatCompletionStoreMessagesPage = void 0;
-var completions_1 = __nccwpck_require__(6993);
+var completions_1 = __nccwpck_require__(7377);
 Object.defineProperty(exports, "ChatCompletionStoreMessagesPage", ({ enumerable: true, get: function () { return completions_1.ChatCompletionStoreMessagesPage; } }));
 Object.defineProperty(exports, "ChatCompletionsPage", ({ enumerable: true, get: function () { return completions_1.ChatCompletionsPage; } }));
 Object.defineProperty(exports, "Completions", ({ enumerable: true, get: function () { return completions_1.Completions; } }));
-var messages_1 = __nccwpck_require__(1992);
+var messages_1 = __nccwpck_require__(6532);
 Object.defineProperty(exports, "Messages", ({ enumerable: true, get: function () { return messages_1.Messages; } }));
 //# sourceMappingURL=index.js.map
 
 /***/ }),
 
-/***/ 1992:
+/***/ 6532:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -47734,9 +47767,9 @@ Object.defineProperty(exports, "Messages", ({ enumerable: true, get: function ()
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ChatCompletionStoreMessagesPage = exports.Messages = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const completions_1 = __nccwpck_require__(6993);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const completions_1 = __nccwpck_require__(7377);
 Object.defineProperty(exports, "ChatCompletionStoreMessagesPage", ({ enumerable: true, get: function () { return completions_1.ChatCompletionStoreMessagesPage; } }));
 class Messages extends resource_1.APIResource {
     list(completionId, query = {}, options) {
@@ -47751,7 +47784,7 @@ exports.Messages = Messages;
 
 /***/ }),
 
-/***/ 9609:
+/***/ 9723:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -47759,9 +47792,9 @@ exports.Messages = Messages;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Completions = exports.ChatCompletionsPage = exports.ChatCompletionStoreMessagesPage = exports.Chat = void 0;
-var chat_1 = __nccwpck_require__(8790);
+var chat_1 = __nccwpck_require__(4649);
 Object.defineProperty(exports, "Chat", ({ enumerable: true, get: function () { return chat_1.Chat; } }));
-var index_1 = __nccwpck_require__(2062);
+var index_1 = __nccwpck_require__(8921);
 Object.defineProperty(exports, "ChatCompletionStoreMessagesPage", ({ enumerable: true, get: function () { return index_1.ChatCompletionStoreMessagesPage; } }));
 Object.defineProperty(exports, "ChatCompletionsPage", ({ enumerable: true, get: function () { return index_1.ChatCompletionsPage; } }));
 Object.defineProperty(exports, "Completions", ({ enumerable: true, get: function () { return index_1.Completions; } }));
@@ -47769,7 +47802,7 @@ Object.defineProperty(exports, "Completions", ({ enumerable: true, get: function
 
 /***/ }),
 
-/***/ 9569:
+/***/ 786:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -47777,7 +47810,7 @@ Object.defineProperty(exports, "Completions", ({ enumerable: true, get: function
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Completions = void 0;
-const resource_1 = __nccwpck_require__(9293);
+const resource_1 = __nccwpck_require__(3464);
 class Completions extends resource_1.APIResource {
     create(body, options) {
         return this._client.post('/completions', { body, ...options, stream: body.stream ?? false });
@@ -47788,7 +47821,7 @@ exports.Completions = Completions;
 
 /***/ }),
 
-/***/ 4397:
+/***/ 9035:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -47819,11 +47852,11 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ContainerListResponsesPage = exports.Containers = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const FilesAPI = __importStar(__nccwpck_require__(5410));
-const files_1 = __nccwpck_require__(5410);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const FilesAPI = __importStar(__nccwpck_require__(1591));
+const files_1 = __nccwpck_require__(1591);
+const pagination_1 = __nccwpck_require__(9764);
 class Containers extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -47868,7 +47901,7 @@ Containers.FileListResponsesPage = files_1.FileListResponsesPage;
 
 /***/ }),
 
-/***/ 4506:
+/***/ 6214:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -47876,7 +47909,7 @@ Containers.FileListResponsesPage = files_1.FileListResponsesPage;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Content = void 0;
-const resource_1 = __nccwpck_require__(9293);
+const resource_1 = __nccwpck_require__(3464);
 class Content extends resource_1.APIResource {
     /**
      * Retrieve Container File Content
@@ -47894,7 +47927,7 @@ exports.Content = Content;
 
 /***/ }),
 
-/***/ 5410:
+/***/ 1591:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -47925,12 +47958,12 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.FileListResponsesPage = exports.Files = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const Core = __importStar(__nccwpck_require__(233));
-const ContentAPI = __importStar(__nccwpck_require__(4506));
-const content_1 = __nccwpck_require__(4506);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const Core = __importStar(__nccwpck_require__(8103));
+const ContentAPI = __importStar(__nccwpck_require__(6214));
+const content_1 = __nccwpck_require__(6214);
+const pagination_1 = __nccwpck_require__(9764);
 class Files extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -47980,7 +48013,7 @@ Files.Content = content_1.Content;
 
 /***/ }),
 
-/***/ 1318:
+/***/ 5977:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -48011,8 +48044,8 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Embeddings = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const Core = __importStar(__nccwpck_require__(233));
+const resource_1 = __nccwpck_require__(3464);
+const Core = __importStar(__nccwpck_require__(8103));
 class Embeddings extends resource_1.APIResource {
     /**
      * Creates an embedding vector representing the input text.
@@ -48066,7 +48099,7 @@ exports.Embeddings = Embeddings;
 
 /***/ }),
 
-/***/ 3585:
+/***/ 4708:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -48097,11 +48130,11 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.EvalListResponsesPage = exports.Evals = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const RunsAPI = __importStar(__nccwpck_require__(3759));
-const runs_1 = __nccwpck_require__(3759);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const RunsAPI = __importStar(__nccwpck_require__(2080));
+const runs_1 = __nccwpck_require__(2080);
+const pagination_1 = __nccwpck_require__(9764);
 class Evals extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -48154,7 +48187,7 @@ Evals.RunListResponsesPage = runs_1.RunListResponsesPage;
 
 /***/ }),
 
-/***/ 6299:
+/***/ 2387:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -48162,9 +48195,9 @@ Evals.RunListResponsesPage = runs_1.RunListResponsesPage;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.OutputItemListResponsesPage = exports.OutputItems = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const pagination_1 = __nccwpck_require__(9764);
 class OutputItems extends resource_1.APIResource {
     /**
      * Get an evaluation run output item by ID.
@@ -48188,7 +48221,7 @@ OutputItems.OutputItemListResponsesPage = OutputItemListResponsesPage;
 
 /***/ }),
 
-/***/ 3759:
+/***/ 2080:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -48219,11 +48252,11 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.RunListResponsesPage = exports.Runs = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const OutputItemsAPI = __importStar(__nccwpck_require__(6299));
-const output_items_1 = __nccwpck_require__(6299);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const OutputItemsAPI = __importStar(__nccwpck_require__(2387));
+const output_items_1 = __nccwpck_require__(2387);
+const pagination_1 = __nccwpck_require__(9764);
 class Runs extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -48273,7 +48306,7 @@ Runs.OutputItemListResponsesPage = output_items_1.OutputItemListResponsesPage;
 
 /***/ }),
 
-/***/ 446:
+/***/ 2365:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -48304,12 +48337,12 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.FileObjectsPage = exports.Files = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const core_2 = __nccwpck_require__(233);
-const error_1 = __nccwpck_require__(872);
-const Core = __importStar(__nccwpck_require__(233));
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const core_2 = __nccwpck_require__(8103);
+const error_1 = __nccwpck_require__(3890);
+const Core = __importStar(__nccwpck_require__(8103));
+const pagination_1 = __nccwpck_require__(9764);
 class Files extends resource_1.APIResource {
     /**
      * Upload a file that can be used across various endpoints. Individual files can be
@@ -48401,7 +48434,7 @@ Files.FileObjectsPage = FileObjectsPage;
 
 /***/ }),
 
-/***/ 3173:
+/***/ 8978:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -48432,9 +48465,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Alpha = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const GradersAPI = __importStar(__nccwpck_require__(3146));
-const graders_1 = __nccwpck_require__(3146);
+const resource_1 = __nccwpck_require__(3464);
+const GradersAPI = __importStar(__nccwpck_require__(6237));
+const graders_1 = __nccwpck_require__(6237);
 class Alpha extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -48447,7 +48480,7 @@ Alpha.Graders = graders_1.Graders;
 
 /***/ }),
 
-/***/ 3146:
+/***/ 6237:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -48455,7 +48488,7 @@ Alpha.Graders = graders_1.Graders;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Graders = void 0;
-const resource_1 = __nccwpck_require__(9293);
+const resource_1 = __nccwpck_require__(3464);
 class Graders extends resource_1.APIResource {
     /**
      * Run a grader.
@@ -48504,7 +48537,7 @@ exports.Graders = Graders;
 
 /***/ }),
 
-/***/ 3572:
+/***/ 5655:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -48535,9 +48568,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Checkpoints = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const PermissionsAPI = __importStar(__nccwpck_require__(5591));
-const permissions_1 = __nccwpck_require__(5591);
+const resource_1 = __nccwpck_require__(3464);
+const PermissionsAPI = __importStar(__nccwpck_require__(2146));
+const permissions_1 = __nccwpck_require__(2146);
 class Checkpoints extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -48551,7 +48584,7 @@ Checkpoints.PermissionCreateResponsesPage = permissions_1.PermissionCreateRespon
 
 /***/ }),
 
-/***/ 5591:
+/***/ 2146:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -48559,9 +48592,9 @@ Checkpoints.PermissionCreateResponsesPage = permissions_1.PermissionCreateRespon
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.PermissionCreateResponsesPage = exports.Permissions = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const pagination_1 = __nccwpck_require__(9764);
 class Permissions extends resource_1.APIResource {
     /**
      * **NOTE:** Calling this endpoint requires an [admin API key](../admin-api-keys).
@@ -48623,7 +48656,7 @@ Permissions.PermissionCreateResponsesPage = PermissionCreateResponsesPage;
 
 /***/ }),
 
-/***/ 819:
+/***/ 4776:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -48654,15 +48687,15 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.FineTuning = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const MethodsAPI = __importStar(__nccwpck_require__(1952));
-const methods_1 = __nccwpck_require__(1952);
-const AlphaAPI = __importStar(__nccwpck_require__(3173));
-const alpha_1 = __nccwpck_require__(3173);
-const CheckpointsAPI = __importStar(__nccwpck_require__(3572));
-const checkpoints_1 = __nccwpck_require__(3572);
-const JobsAPI = __importStar(__nccwpck_require__(6622));
-const jobs_1 = __nccwpck_require__(6622);
+const resource_1 = __nccwpck_require__(3464);
+const MethodsAPI = __importStar(__nccwpck_require__(4262));
+const methods_1 = __nccwpck_require__(4262);
+const AlphaAPI = __importStar(__nccwpck_require__(8978));
+const alpha_1 = __nccwpck_require__(8978);
+const CheckpointsAPI = __importStar(__nccwpck_require__(5655));
+const checkpoints_1 = __nccwpck_require__(5655);
+const JobsAPI = __importStar(__nccwpck_require__(5423));
+const jobs_1 = __nccwpck_require__(5423);
 class FineTuning extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -48683,7 +48716,7 @@ FineTuning.Alpha = alpha_1.Alpha;
 
 /***/ }),
 
-/***/ 2536:
+/***/ 9856:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -48691,9 +48724,9 @@ FineTuning.Alpha = alpha_1.Alpha;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.FineTuningJobCheckpointsPage = exports.Checkpoints = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const pagination_1 = __nccwpck_require__(9764);
 class Checkpoints extends resource_1.APIResource {
     list(fineTuningJobId, query = {}, options) {
         if ((0, core_1.isRequestOptions)(query)) {
@@ -48711,7 +48744,7 @@ Checkpoints.FineTuningJobCheckpointsPage = FineTuningJobCheckpointsPage;
 
 /***/ }),
 
-/***/ 6622:
+/***/ 5423:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -48742,11 +48775,11 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.FineTuningJobEventsPage = exports.FineTuningJobsPage = exports.Jobs = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const CheckpointsAPI = __importStar(__nccwpck_require__(2536));
-const checkpoints_1 = __nccwpck_require__(2536);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const CheckpointsAPI = __importStar(__nccwpck_require__(9856));
+const checkpoints_1 = __nccwpck_require__(9856);
+const pagination_1 = __nccwpck_require__(9764);
 class Jobs extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -48857,7 +48890,7 @@ Jobs.FineTuningJobCheckpointsPage = checkpoints_1.FineTuningJobCheckpointsPage;
 
 /***/ }),
 
-/***/ 1952:
+/***/ 4262:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -48865,7 +48898,7 @@ Jobs.FineTuningJobCheckpointsPage = checkpoints_1.FineTuningJobCheckpointsPage;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Methods = void 0;
-const resource_1 = __nccwpck_require__(9293);
+const resource_1 = __nccwpck_require__(3464);
 class Methods extends resource_1.APIResource {
 }
 exports.Methods = Methods;
@@ -48873,7 +48906,7 @@ exports.Methods = Methods;
 
 /***/ }),
 
-/***/ 8963:
+/***/ 1891:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -48881,7 +48914,7 @@ exports.Methods = Methods;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.GraderModels = void 0;
-const resource_1 = __nccwpck_require__(9293);
+const resource_1 = __nccwpck_require__(3464);
 class GraderModels extends resource_1.APIResource {
 }
 exports.GraderModels = GraderModels;
@@ -48889,7 +48922,7 @@ exports.GraderModels = GraderModels;
 
 /***/ }),
 
-/***/ 7250:
+/***/ 8301:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -48920,9 +48953,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Graders = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const GraderModelsAPI = __importStar(__nccwpck_require__(8963));
-const grader_models_1 = __nccwpck_require__(8963);
+const resource_1 = __nccwpck_require__(3464);
+const GraderModelsAPI = __importStar(__nccwpck_require__(1891));
+const grader_models_1 = __nccwpck_require__(1891);
 class Graders extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -48935,7 +48968,7 @@ Graders.GraderModels = grader_models_1.GraderModels;
 
 /***/ }),
 
-/***/ 9393:
+/***/ 2833:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -48966,8 +48999,8 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Images = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const Core = __importStar(__nccwpck_require__(233));
+const resource_1 = __nccwpck_require__(3464);
+const Core = __importStar(__nccwpck_require__(8103));
 class Images extends resource_1.APIResource {
     /**
      * Creates a variation of a given image. This endpoint only supports `dall-e-2`.
@@ -49017,7 +49050,7 @@ exports.Images = Images;
 
 /***/ }),
 
-/***/ 2013:
+/***/ 1543:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -49039,44 +49072,44 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.VectorStores = exports.VectorStoreSearchResponsesPage = exports.VectorStoresPage = exports.Uploads = exports.Responses = exports.Moderations = exports.Models = exports.ModelsPage = exports.Images = exports.Graders = exports.FineTuning = exports.Files = exports.FileObjectsPage = exports.Evals = exports.EvalListResponsesPage = exports.Embeddings = exports.Containers = exports.ContainerListResponsesPage = exports.Completions = exports.Beta = exports.Batches = exports.BatchesPage = exports.Audio = void 0;
-__exportStar(__nccwpck_require__(9609), exports);
-__exportStar(__nccwpck_require__(5389), exports);
-var audio_1 = __nccwpck_require__(3897);
+__exportStar(__nccwpck_require__(9723), exports);
+__exportStar(__nccwpck_require__(5400), exports);
+var audio_1 = __nccwpck_require__(6541);
 Object.defineProperty(exports, "Audio", ({ enumerable: true, get: function () { return audio_1.Audio; } }));
-var batches_1 = __nccwpck_require__(9504);
+var batches_1 = __nccwpck_require__(6972);
 Object.defineProperty(exports, "BatchesPage", ({ enumerable: true, get: function () { return batches_1.BatchesPage; } }));
 Object.defineProperty(exports, "Batches", ({ enumerable: true, get: function () { return batches_1.Batches; } }));
-var beta_1 = __nccwpck_require__(1631);
+var beta_1 = __nccwpck_require__(2526);
 Object.defineProperty(exports, "Beta", ({ enumerable: true, get: function () { return beta_1.Beta; } }));
-var completions_1 = __nccwpck_require__(9569);
+var completions_1 = __nccwpck_require__(786);
 Object.defineProperty(exports, "Completions", ({ enumerable: true, get: function () { return completions_1.Completions; } }));
-var containers_1 = __nccwpck_require__(4397);
+var containers_1 = __nccwpck_require__(9035);
 Object.defineProperty(exports, "ContainerListResponsesPage", ({ enumerable: true, get: function () { return containers_1.ContainerListResponsesPage; } }));
 Object.defineProperty(exports, "Containers", ({ enumerable: true, get: function () { return containers_1.Containers; } }));
-var embeddings_1 = __nccwpck_require__(1318);
+var embeddings_1 = __nccwpck_require__(5977);
 Object.defineProperty(exports, "Embeddings", ({ enumerable: true, get: function () { return embeddings_1.Embeddings; } }));
-var evals_1 = __nccwpck_require__(3585);
+var evals_1 = __nccwpck_require__(4708);
 Object.defineProperty(exports, "EvalListResponsesPage", ({ enumerable: true, get: function () { return evals_1.EvalListResponsesPage; } }));
 Object.defineProperty(exports, "Evals", ({ enumerable: true, get: function () { return evals_1.Evals; } }));
-var files_1 = __nccwpck_require__(446);
+var files_1 = __nccwpck_require__(2365);
 Object.defineProperty(exports, "FileObjectsPage", ({ enumerable: true, get: function () { return files_1.FileObjectsPage; } }));
 Object.defineProperty(exports, "Files", ({ enumerable: true, get: function () { return files_1.Files; } }));
-var fine_tuning_1 = __nccwpck_require__(819);
+var fine_tuning_1 = __nccwpck_require__(4776);
 Object.defineProperty(exports, "FineTuning", ({ enumerable: true, get: function () { return fine_tuning_1.FineTuning; } }));
-var graders_1 = __nccwpck_require__(7250);
+var graders_1 = __nccwpck_require__(8301);
 Object.defineProperty(exports, "Graders", ({ enumerable: true, get: function () { return graders_1.Graders; } }));
-var images_1 = __nccwpck_require__(9393);
+var images_1 = __nccwpck_require__(2833);
 Object.defineProperty(exports, "Images", ({ enumerable: true, get: function () { return images_1.Images; } }));
-var models_1 = __nccwpck_require__(7382);
+var models_1 = __nccwpck_require__(9529);
 Object.defineProperty(exports, "ModelsPage", ({ enumerable: true, get: function () { return models_1.ModelsPage; } }));
 Object.defineProperty(exports, "Models", ({ enumerable: true, get: function () { return models_1.Models; } }));
-var moderations_1 = __nccwpck_require__(9541);
+var moderations_1 = __nccwpck_require__(7361);
 Object.defineProperty(exports, "Moderations", ({ enumerable: true, get: function () { return moderations_1.Moderations; } }));
-var responses_1 = __nccwpck_require__(8159);
+var responses_1 = __nccwpck_require__(1705);
 Object.defineProperty(exports, "Responses", ({ enumerable: true, get: function () { return responses_1.Responses; } }));
-var uploads_1 = __nccwpck_require__(6012);
+var uploads_1 = __nccwpck_require__(3255);
 Object.defineProperty(exports, "Uploads", ({ enumerable: true, get: function () { return uploads_1.Uploads; } }));
-var vector_stores_1 = __nccwpck_require__(9266);
+var vector_stores_1 = __nccwpck_require__(5998);
 Object.defineProperty(exports, "VectorStoresPage", ({ enumerable: true, get: function () { return vector_stores_1.VectorStoresPage; } }));
 Object.defineProperty(exports, "VectorStoreSearchResponsesPage", ({ enumerable: true, get: function () { return vector_stores_1.VectorStoreSearchResponsesPage; } }));
 Object.defineProperty(exports, "VectorStores", ({ enumerable: true, get: function () { return vector_stores_1.VectorStores; } }));
@@ -49084,7 +49117,7 @@ Object.defineProperty(exports, "VectorStores", ({ enumerable: true, get: functio
 
 /***/ }),
 
-/***/ 7382:
+/***/ 9529:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -49092,8 +49125,8 @@ Object.defineProperty(exports, "VectorStores", ({ enumerable: true, get: functio
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ModelsPage = exports.Models = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const pagination_1 = __nccwpck_require__(9764);
 class Models extends resource_1.APIResource {
     /**
      * Retrieves a model instance, providing basic information about the model such as
@@ -49129,7 +49162,7 @@ Models.ModelsPage = ModelsPage;
 
 /***/ }),
 
-/***/ 9541:
+/***/ 7361:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -49137,7 +49170,7 @@ Models.ModelsPage = ModelsPage;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Moderations = void 0;
-const resource_1 = __nccwpck_require__(9293);
+const resource_1 = __nccwpck_require__(3464);
 class Moderations extends resource_1.APIResource {
     /**
      * Classifies if text and/or image inputs are potentially harmful. Learn more in
@@ -49152,7 +49185,7 @@ exports.Moderations = Moderations;
 
 /***/ }),
 
-/***/ 2551:
+/***/ 545:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -49160,9 +49193,9 @@ exports.Moderations = Moderations;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ResponseItemsPage = exports.InputItems = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const responses_1 = __nccwpck_require__(8159);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const responses_1 = __nccwpck_require__(1705);
 Object.defineProperty(exports, "ResponseItemsPage", ({ enumerable: true, get: function () { return responses_1.ResponseItemsPage; } }));
 class InputItems extends resource_1.APIResource {
     list(responseId, query = {}, options) {
@@ -49180,7 +49213,7 @@ exports.InputItems = InputItems;
 
 /***/ }),
 
-/***/ 8159:
+/***/ 1705:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -49211,12 +49244,12 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ResponseItemsPage = exports.Responses = void 0;
-const ResponsesParser_1 = __nccwpck_require__(5872);
-const resource_1 = __nccwpck_require__(9293);
-const InputItemsAPI = __importStar(__nccwpck_require__(2551));
-const input_items_1 = __nccwpck_require__(2551);
-const ResponseStream_1 = __nccwpck_require__(8319);
-const pagination_1 = __nccwpck_require__(1694);
+const ResponsesParser_1 = __nccwpck_require__(3480);
+const resource_1 = __nccwpck_require__(3464);
+const InputItemsAPI = __importStar(__nccwpck_require__(545));
+const input_items_1 = __nccwpck_require__(545);
+const ResponseStream_1 = __nccwpck_require__(9334);
+const pagination_1 = __nccwpck_require__(9764);
 class Responses extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -49292,7 +49325,7 @@ Responses.InputItems = input_items_1.InputItems;
 
 /***/ }),
 
-/***/ 5389:
+/***/ 5400:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -49303,7 +49336,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
-/***/ 8343:
+/***/ 6213:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -49334,8 +49367,8 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Parts = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const Core = __importStar(__nccwpck_require__(233));
+const resource_1 = __nccwpck_require__(3464);
+const Core = __importStar(__nccwpck_require__(8103));
 class Parts extends resource_1.APIResource {
     /**
      * Adds a
@@ -49359,7 +49392,7 @@ exports.Parts = Parts;
 
 /***/ }),
 
-/***/ 6012:
+/***/ 3255:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -49390,9 +49423,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Uploads = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const PartsAPI = __importStar(__nccwpck_require__(8343));
-const parts_1 = __nccwpck_require__(8343);
+const resource_1 = __nccwpck_require__(3464);
+const PartsAPI = __importStar(__nccwpck_require__(6213));
+const parts_1 = __nccwpck_require__(6213);
 class Uploads extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -49453,7 +49486,7 @@ Uploads.Parts = parts_1.Parts;
 
 /***/ }),
 
-/***/ 6039:
+/***/ 15:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -49461,11 +49494,11 @@ Uploads.Parts = parts_1.Parts;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.VectorStoreFilesPage = exports.FileBatches = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const core_2 = __nccwpck_require__(233);
-const Util_1 = __nccwpck_require__(9231);
-const files_1 = __nccwpck_require__(4582);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const core_2 = __nccwpck_require__(8103);
+const Util_1 = __nccwpck_require__(9028);
+const files_1 = __nccwpck_require__(6230);
 Object.defineProperty(exports, "VectorStoreFilesPage", ({ enumerable: true, get: function () { return files_1.VectorStoreFilesPage; } }));
 class FileBatches extends resource_1.APIResource {
     /**
@@ -49587,7 +49620,7 @@ exports.FileBatches = FileBatches;
 
 /***/ }),
 
-/***/ 4582:
+/***/ 6230:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
@@ -49595,9 +49628,9 @@ exports.FileBatches = FileBatches;
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.FileContentResponsesPage = exports.VectorStoreFilesPage = exports.Files = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const pagination_1 = __nccwpck_require__(9764);
 class Files extends resource_1.APIResource {
     /**
      * Create a vector store file by attaching a
@@ -49739,7 +49772,7 @@ Files.FileContentResponsesPage = FileContentResponsesPage;
 
 /***/ }),
 
-/***/ 9266:
+/***/ 5998:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -49770,13 +49803,13 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.VectorStoreSearchResponsesPage = exports.VectorStoresPage = exports.VectorStores = void 0;
-const resource_1 = __nccwpck_require__(9293);
-const core_1 = __nccwpck_require__(233);
-const FileBatchesAPI = __importStar(__nccwpck_require__(6039));
-const file_batches_1 = __nccwpck_require__(6039);
-const FilesAPI = __importStar(__nccwpck_require__(4582));
-const files_1 = __nccwpck_require__(4582);
-const pagination_1 = __nccwpck_require__(1694);
+const resource_1 = __nccwpck_require__(3464);
+const core_1 = __nccwpck_require__(8103);
+const FileBatchesAPI = __importStar(__nccwpck_require__(15));
+const file_batches_1 = __nccwpck_require__(15);
+const FilesAPI = __importStar(__nccwpck_require__(6230));
+const files_1 = __nccwpck_require__(6230);
+const pagination_1 = __nccwpck_require__(9764);
 class VectorStores extends resource_1.APIResource {
     constructor() {
         super(...arguments);
@@ -49864,19 +49897,19 @@ VectorStores.FileBatches = file_batches_1.FileBatches;
 
 /***/ }),
 
-/***/ 6642:
+/***/ 7578:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports._iterSSEMessages = exports.Stream = void 0;
-const index_1 = __nccwpck_require__(2233);
-const error_1 = __nccwpck_require__(872);
-const line_1 = __nccwpck_require__(7506);
-const stream_utils_1 = __nccwpck_require__(8275);
-const core_1 = __nccwpck_require__(233);
-const error_2 = __nccwpck_require__(872);
+const index_1 = __nccwpck_require__(4122);
+const error_1 = __nccwpck_require__(3890);
+const line_1 = __nccwpck_require__(1438);
+const stream_utils_1 = __nccwpck_require__(3552);
+const core_1 = __nccwpck_require__(8103);
+const error_2 = __nccwpck_require__(3890);
 class Stream {
     constructor(iterator, controller) {
         this.iterator = iterator;
@@ -50156,15 +50189,15 @@ function partition(str, delimiter) {
 
 /***/ }),
 
-/***/ 8173:
+/***/ 9820:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createForm = exports.multipartFormRequestOptions = exports.maybeMultipartFormRequestOptions = exports.isMultipartBody = exports.toFile = exports.isUploadable = exports.isBlobLike = exports.isFileLike = exports.isResponseLike = exports.fileFromPath = void 0;
-const index_1 = __nccwpck_require__(2233);
-var index_2 = __nccwpck_require__(2233);
+const index_1 = __nccwpck_require__(4122);
+var index_2 = __nccwpck_require__(4122);
 Object.defineProperty(exports, "fileFromPath", ({ enumerable: true, get: function () { return index_2.fileFromPath; } }));
 const isResponseLike = (value) => value != null &&
     typeof value === 'object' &&
@@ -50334,7 +50367,7 @@ const addFormValue = async (form, key, value) => {
 
 /***/ }),
 
-/***/ 6140:
+/***/ 2649:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";

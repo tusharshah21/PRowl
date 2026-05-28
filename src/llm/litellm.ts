@@ -31,6 +31,48 @@ export interface LLMMessage {
 // Default to OpenAI, but users can override with any OpenAI-compatible endpoint
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
 
+// Token-limit / temperature parameters differ across model families:
+//  - legacy chat models + most OpenAI-compatible providers (Groq, DeepSeek,
+//    Ollama, OpenRouter, ...) use `max_tokens` and accept a custom temperature.
+//  - newer OpenAI models (gpt-5, o-series) renamed it to `max_completion_tokens`
+//    and only accept the default temperature.
+// We probe in this order and remember the shape that worked, per model, so we
+// stay provider-agnostic instead of hardcoding model names.
+type ParamShape = "legacy" | "completion_temp" | "completion_only";
+const SHAPE_ORDER: ParamShape[] = ["legacy", "completion_temp", "completion_only"];
+const shapeMemo = new Map<string, ParamShape>();
+
+function buildParams(
+  shape: ParamShape,
+  model: string,
+  messages: LLMMessage[],
+  maxTokens: number,
+  temperature: number
+): Record<string, unknown> {
+  const base: Record<string, unknown> = { model, messages };
+  if (shape === "legacy") {
+    base.max_tokens = maxTokens;
+    base.temperature = temperature;
+  } else if (shape === "completion_temp") {
+    base.max_completion_tokens = maxTokens;
+    base.temperature = temperature;
+  } else {
+    base.max_completion_tokens = maxTokens; // omit temperature → provider default
+  }
+  return base;
+}
+
+function isUnsupportedParamError(error: unknown): boolean {
+  const e = error as { status?: number; code?: string; message?: string };
+  if (!e || e.status !== 400) return false;
+  return (
+    e.code === "unsupported_parameter" ||
+    /unsupported parameter|not supported with this model|max_completion_tokens/i.test(
+      e.message || ""
+    )
+  );
+}
+
 /**
  * Calls LLM using OpenAI-compatible API format.
  * 
@@ -57,29 +99,42 @@ export async function callLLM(
     }
   }
 
-  try {
-    const client = new OpenAI({
-      apiKey: config.apiKey,
-      baseURL: config.baseURL || DEFAULT_BASE_URL,
-    });
+  const client = new OpenAI({
+    apiKey: config.apiKey,
+    baseURL: config.baseURL || DEFAULT_BASE_URL,
+  });
+  const temperature = config.temperature ?? 0.2;
+  const maxTokens = config.maxTokens ?? 700;
 
-    const response = await client.chat.completions.create({
-      model: config.model,
-      messages: messages,
-      temperature: config.temperature ?? 0.2,
-      max_tokens: config.maxTokens ?? 700,
-    });
+  // Start from the shape that previously worked for this model, then fall
+  // forward through the remaining shapes on "unsupported parameter" errors.
+  const start = SHAPE_ORDER.indexOf(shapeMemo.get(config.model) ?? "legacy");
 
-    const content = response.choices[0]?.message?.content?.trim() || null;
-    if (useCache && content) cacheSet(config, messages, content);
-    return content;
-  } catch (error) {
-    console.error("LLM API Error:", error);
-    if (error instanceof Error) {
-      console.error("Details:", error.message);
+  for (let i = Math.max(start, 0); i < SHAPE_ORDER.length; i++) {
+    const shape = SHAPE_ORDER[i];
+    try {
+      const response = await client.chat.completions.create(
+        buildParams(shape, config.model, messages, maxTokens, temperature) as any
+      );
+      shapeMemo.set(config.model, shape);
+      const content = response.choices[0]?.message?.content?.trim() || null;
+      if (useCache && content) cacheSet(config, messages, content);
+      return content;
+    } catch (error) {
+      if (isUnsupportedParamError(error) && i < SHAPE_ORDER.length - 1) {
+        console.log(
+          `[llm] '${shape}' params rejected by ${config.model}; retrying with '${SHAPE_ORDER[i + 1]}'`
+        );
+        continue;
+      }
+      console.error("LLM API Error:", error);
+      if (error instanceof Error) {
+        console.error("Details:", error.message);
+      }
+      return null;
     }
-    return null;
   }
+  return null;
 }
 
 // Backward compatibility alias
