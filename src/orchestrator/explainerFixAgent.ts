@@ -1,8 +1,6 @@
-import * as fs from "fs";
 import { callLLM, LLMConfig } from "../llm/litellm";
+import { extractSemanticContext } from "./semanticContext";
 import { ExplainerFixResponse, IssueType } from "./types";
-
-const SURROUNDING_LINES = 15;
 
 function buildPrompt(issueType: IssueType): string {
   return `You are a senior engineer. You receive a code chunk flagged as a ${issueType} issue, optionally with surrounding file context.
@@ -13,19 +11,6 @@ Your job:
 
 OUTPUT (strict JSON, nothing else):
 {"explanation":"<what's wrong and why>","fixedCode":"<corrected code snippet>","lineNumber":<original line number>}`;
-}
-
-function readSurrounding(filePath: string, line: number): string | null {
-  try {
-    if (!filePath || !fs.existsSync(filePath)) return null;
-    const lines = fs.readFileSync(filePath, "utf8").split("\n");
-    const lo = Math.max(0, line - 1 - SURROUNDING_LINES);
-    const hi = Math.min(lines.length, line + SURROUNDING_LINES);
-    const slice = lines.slice(lo, hi);
-    return slice.map((l, i) => `${lo + i + 1}: ${l}`).join("\n");
-  } catch {
-    return null;
-  }
 }
 
 function cleanJSON(raw: string): string {
@@ -45,10 +30,10 @@ export async function runExplainerFixAgent(
   config: LLMConfig,
   filePath?: string
 ): Promise<ExplainerFixResponse | null> {
-  const surrounding = filePath ? readSurrounding(filePath, lineNumber) : null;
+  const surrounding = filePath ? extractSemanticContext(filePath, lineNumber) : null;
   const userParts = [`Line ${lineNumber}:`, chunk];
   if (surrounding) {
-    userParts.push("", "Surrounding file context (line: code):", surrounding);
+    userParts.push("", surrounding);
   }
   const response = await callLLM(config, [
     { role: "system", content: buildPrompt(issueType) },

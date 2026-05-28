@@ -36153,39 +36153,6 @@ exports.Notifier = Notifier;
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -36197,9 +36164,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.runExplainerFixAgent = runExplainerFixAgent;
-const fs = __importStar(__nccwpck_require__(7147));
 const litellm_1 = __nccwpck_require__(1358);
-const SURROUNDING_LINES = 15;
+const semanticContext_1 = __nccwpck_require__(5835);
 function buildPrompt(issueType) {
     return `You are a senior engineer. You receive a code chunk flagged as a ${issueType} issue, optionally with surrounding file context.
 
@@ -36209,20 +36175,6 @@ Your job:
 
 OUTPUT (strict JSON, nothing else):
 {"explanation":"<what's wrong and why>","fixedCode":"<corrected code snippet>","lineNumber":<original line number>}`;
-}
-function readSurrounding(filePath, line) {
-    try {
-        if (!filePath || !fs.existsSync(filePath))
-            return null;
-        const lines = fs.readFileSync(filePath, "utf8").split("\n");
-        const lo = Math.max(0, line - 1 - SURROUNDING_LINES);
-        const hi = Math.min(lines.length, line + SURROUNDING_LINES);
-        const slice = lines.slice(lo, hi);
-        return slice.map((l, i) => `${lo + i + 1}: ${l}`).join("\n");
-    }
-    catch (_a) {
-        return null;
-    }
 }
 function cleanJSON(raw) {
     let cleaned = raw.trim();
@@ -36236,10 +36188,10 @@ function cleanJSON(raw) {
 }
 function runExplainerFixAgent(chunk, issueType, lineNumber, config, filePath) {
     return __awaiter(this, void 0, void 0, function* () {
-        const surrounding = filePath ? readSurrounding(filePath, lineNumber) : null;
+        const surrounding = filePath ? (0, semanticContext_1.extractSemanticContext)(filePath, lineNumber) : null;
         const userParts = [`Line ${lineNumber}:`, chunk];
         if (surrounding) {
-            userParts.push("", "Surrounding file context (line: code):", surrounding);
+            userParts.push("", surrounding);
         }
         const response = yield (0, litellm_1.callLLM)(config, [
             { role: "system", content: buildPrompt(issueType) },
@@ -36411,6 +36363,246 @@ function runReviewerAgent(toonDiff, config, semgrepFindings) {
             return [];
         }
     });
+}
+
+
+/***/ }),
+
+/***/ 5835:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.extractSemanticContext = extractSemanticContext;
+const fs = __importStar(__nccwpck_require__(7147));
+const MAX_BLOCK_LINES = 120;
+const MAX_IMPORT_LINES = 40;
+const FALLBACK_RADIUS = 15;
+const INDENT_EXTS = new Set(["py", "pyi"]);
+const BRACE_EXTS = new Set([
+    "js", "jsx", "ts", "tsx", "mjs", "cjs",
+    "go", "java", "c", "h", "cc", "cpp", "hpp", "cs",
+    "rs", "kt", "kts", "swift", "scala", "php", "rb",
+]);
+function styleFor(ext) {
+    if (INDENT_EXTS.has(ext))
+        return "indent";
+    return "brace"; // default; brace-balance degrades gracefully on unknown langs
+}
+const IMPORT_PATTERNS = [
+    /^\s*import\b/, // JS/TS/Java/Python/Go/Kotlin/Swift
+    /^\s*export\s+.*\bfrom\b/, // TS re-exports
+    /^\s*from\s+\S+\s+import\b/, // Python
+    /^\s*(const|let|var)\s+.*=\s*require\(/, // CommonJS
+    /^\s*#include\b/, // C/C++
+    /^\s*using\b/, // C#
+    /^\s*use\b/, // Rust/PHP
+    /^\s*require(_relative)?\b/, // Ruby
+    /^\s*package\b/, // Go/Java package decl (cheap, useful)
+];
+function collectImports(lines) {
+    const out = [];
+    // Scan only the head of the file; stop after a run of non-import code so we
+    // don't sweep the whole file on languages without a clear import block.
+    let sinceLastImport = 0;
+    for (let i = 0; i < lines.length && out.length < MAX_IMPORT_LINES; i++) {
+        const line = lines[i];
+        if (line.trim() === "")
+            continue;
+        if (IMPORT_PATTERNS.some((re) => re.test(line))) {
+            out.push(`${i + 1}: ${line}`);
+            sinceLastImport = 0;
+        }
+        else {
+            sinceLastImport++;
+            if (sinceLastImport > 8)
+                break;
+        }
+    }
+    return out;
+}
+const BLOCK_SIGNATURE = /\b(function|class|interface|struct|enum|impl|trait|def|fn|func|public|private|protected|static|async|export|const)\b/;
+// Walk the prefix [0..targetIdx] tracking a stack of line indices that opened a
+// still-open `{`. The innermost still-open block that looks like a declaration
+// is the enclosing function/class; otherwise fall back to the innermost block.
+function enclosingBraceBlock(lines, targetIdx) {
+    const openStack = [];
+    let inBlockComment = false;
+    for (let i = 0; i <= targetIdx; i++) {
+        const raw = lines[i];
+        for (let c = 0; c < raw.length; c++) {
+            const ch = raw[c];
+            const next = raw[c + 1];
+            if (inBlockComment) {
+                if (ch === "*" && next === "/") {
+                    inBlockComment = false;
+                    c++;
+                }
+                continue;
+            }
+            if (ch === "/" && next === "*") {
+                inBlockComment = true;
+                c++;
+                continue;
+            }
+            if (ch === "/" && next === "/")
+                break; // rest of line is a comment
+            if (ch === "{")
+                openStack.push(i);
+            else if (ch === "}")
+                openStack.pop();
+        }
+    }
+    if (openStack.length === 0)
+        return null;
+    let start = openStack[openStack.length - 1];
+    for (let s = openStack.length - 1; s >= 0; s--) {
+        if (BLOCK_SIGNATURE.test(lines[openStack[s]])) {
+            start = openStack[s];
+            break;
+        }
+    }
+    // Pull in a multi-line signature that precedes the opening brace line.
+    while (start > 0 &&
+        !BLOCK_SIGNATURE.test(lines[start]) &&
+        BLOCK_SIGNATURE.test(lines[start - 1])) {
+        start--;
+    }
+    // Find the matching close brace from `start`.
+    let depth = 0;
+    let started = false;
+    let end = lines.length - 1;
+    for (let i = start; i < lines.length; i++) {
+        for (const ch of lines[i]) {
+            if (ch === "{") {
+                depth++;
+                started = true;
+            }
+            else if (ch === "}") {
+                depth--;
+            }
+        }
+        if (started && depth <= 0) {
+            end = i;
+            break;
+        }
+    }
+    return { start, end };
+}
+// Python-style: the enclosing def/class is the nearest line above the target
+// with strictly smaller indentation that starts a def/class block.
+function enclosingIndentBlock(lines, targetIdx) {
+    const indentOf = (s) => s.length - s.replace(/^\s*/, "").length;
+    const targetIndent = indentOf(lines[targetIdx]);
+    let start = -1;
+    let headerIndent = 0;
+    for (let i = targetIdx; i >= 0; i--) {
+        const line = lines[i];
+        if (line.trim() === "")
+            continue;
+        const ind = indentOf(line);
+        if (ind < targetIndent && /^\s*(async\s+def|def|class)\b/.test(line)) {
+            start = i;
+            headerIndent = ind;
+            break;
+        }
+    }
+    if (start === -1)
+        return null;
+    let end = lines.length - 1;
+    for (let i = start + 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.trim() === "")
+            continue;
+        if (indentOf(line) <= headerIndent) {
+            end = i - 1;
+            break;
+        }
+    }
+    return { start, end };
+}
+function numbered(lines, lo, hi) {
+    const out = [];
+    for (let i = lo; i <= hi; i++)
+        out.push(`${i + 1}: ${lines[i]}`);
+    return out.join("\n");
+}
+/**
+ * Returns the file's imports plus the function/class enclosing `line`, each
+ * prefixed with its 1-based line number. Falls back to a ±15-line window when
+ * no enclosing block can be resolved. Returns null if the file is unavailable.
+ */
+function extractSemanticContext(filePath, line) {
+    try {
+        if (!filePath || !fs.existsSync(filePath))
+            return null;
+        const lines = fs.readFileSync(filePath, "utf8").split("\n");
+        const targetIdx = Math.min(Math.max(line - 1, 0), lines.length - 1);
+        const ext = (filePath.split(".").pop() || "").toLowerCase();
+        const style = styleFor(ext);
+        let block = style === "indent"
+            ? enclosingIndentBlock(lines, targetIdx)
+            : enclosingBraceBlock(lines, targetIdx);
+        // Cap oversized blocks to a window around the target so a 2000-line file
+        // doesn't blow the prompt budget.
+        if (block && block.end - block.start > MAX_BLOCK_LINES) {
+            block = {
+                start: Math.max(block.start, targetIdx - FALLBACK_RADIUS),
+                end: Math.min(block.end, targetIdx + FALLBACK_RADIUS),
+            };
+        }
+        if (!block) {
+            const lo = Math.max(0, targetIdx - FALLBACK_RADIUS);
+            const hi = Math.min(lines.length - 1, targetIdx + FALLBACK_RADIUS);
+            block = { start: lo, end: hi };
+        }
+        const imports = collectImports(lines);
+        const parts = [];
+        // Don't repeat import lines if the enclosing block already covers the head.
+        const importsBelowBlock = imports.length > 0 && block.start > MAX_IMPORT_LINES;
+        if (imports.length > 0 && importsBelowBlock) {
+            parts.push("Imports:", imports.join("\n"), "");
+        }
+        parts.push("Enclosing block (line: code):", numbered(lines, block.start, block.end));
+        return parts.join("\n");
+    }
+    catch (_a) {
+        return null;
+    }
 }
 
 

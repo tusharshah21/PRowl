@@ -19,7 +19,7 @@
 - GitHub Models (free for public repos): `https://models.inference.ai.azure.com`
 
 ### Fix-quality
-- Agent 2 now receives a snippet of the surrounding file (±15 lines) when the file is available on the runner, giving it imports / enclosing function signature for better fix accuracy.
+- Agent 2 now receives **semantic context** instead of a fixed line window: a zero-dependency structural scan extracts the file's imports plus the enclosing function/class (brace-balanced for C-like/JS/TS/Go, indentation-based for Python). Oversized blocks fall back to a ±15-line window; files without a resolvable block fall back to the line window too. Gives the model the enclosing signature and imports for more accurate fixes.
 
 ### Internal
 - Reviewer prompt updated to describe the new TOON format and to instruct the model to focus on added (`+`) rows.
