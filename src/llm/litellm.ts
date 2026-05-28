@@ -113,7 +113,7 @@ export async function callLLM(
     baseURL: config.baseURL || DEFAULT_BASE_URL,
   });
   const temperature = config.temperature ?? 0.2;
-  const maxTokens = config.maxTokens ?? 700;
+  const baseMaxTokens = config.maxTokens ?? 700;
 
   // Start from the shape that previously worked for this model, then fall
   // forward through the remaining shapes on "unsupported parameter" errors.
@@ -121,26 +121,47 @@ export async function callLLM(
 
   for (let i = Math.max(start, 0); i < SHAPE_ORDER.length; i++) {
     const shape = SHAPE_ORDER[i];
-    try {
-      const response = await client.chat.completions.create(
-        buildParams(shape, config.model, messages, maxTokens, temperature) as any
-      );
-      shapeMemo.set(config.model, shape);
-      const content = response.choices[0]?.message?.content?.trim() || null;
-      if (useCache && content) cacheSet(config, messages, content);
-      return content;
-    } catch (error) {
-      if (isUnsupportedParamError(error) && i < SHAPE_ORDER.length - 1) {
-        console.log(
-          `[llm] '${shape}' params rejected by ${config.model}; retrying with '${SHAPE_ORDER[i + 1]}'`
+    // Reasoning models (the completion_only shape) spend tokens on hidden
+    // reasoning before any visible output, so a small budget yields an empty,
+    // truncated response. Give that shape real headroom up front.
+    let budget = shape === "completion_only" ? Math.max(baseMaxTokens, 4000) : baseMaxTokens;
+
+    let truncationRetries = 0;
+    while (true) {
+      try {
+        const response = await client.chat.completions.create(
+          buildParams(shape, config.model, messages, budget, temperature) as any
         );
-        continue;
+        const choice = response.choices[0];
+        const content = choice?.message?.content?.trim() || null;
+
+        // Empty + truncated → the budget was consumed by reasoning. Grow it and retry.
+        if (!content && choice?.finish_reason === "length" && truncationRetries < 2) {
+          truncationRetries++;
+          const grown = Math.min(budget * 3, 16000);
+          console.log(
+            `[llm] ${config.model} returned empty/truncated output at budget ${budget}; retrying at ${grown}`
+          );
+          budget = grown;
+          continue;
+        }
+
+        shapeMemo.set(config.model, shape);
+        if (useCache && content) cacheSet(config, messages, content);
+        return content;
+      } catch (error) {
+        if (isUnsupportedParamError(error) && i < SHAPE_ORDER.length - 1) {
+          console.log(
+            `[llm] '${shape}' params rejected by ${config.model}; retrying with '${SHAPE_ORDER[i + 1]}'`
+          );
+          break; // advance to the next shape in the outer loop
+        }
+        console.error("LLM API Error:", error);
+        if (error instanceof Error) {
+          console.error("Details:", error.message);
+        }
+        return null;
       }
-      console.error("LLM API Error:", error);
-      if (error instanceof Error) {
-        console.error("Details:", error.message);
-      }
-      return null;
     }
   }
   return null;

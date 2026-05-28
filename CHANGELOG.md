@@ -3,7 +3,8 @@
 ## 1.1.1
 
 ### Fixes
-- **Newer OpenAI models (`gpt-5`, `o`-series) now work.** They reject the legacy `max_tokens` parameter (and a custom `temperature`); the client previously always sent `max_tokens`, so the reviewer call 400'd and silently returned no issues. `callLLM` is now adaptive: it tries the standard params and, only on an "unsupported parameter" error, falls forward to `max_completion_tokens` (and drops `temperature`). The working shape is memoized per model. No model-name hardcoding, so OpenAI-compatible providers that expect `max_tokens` (Groq, DeepSeek, Ollama, etc.) are unaffected.
+- **Newer OpenAI models (`gpt-5`, `o`-series) now work.** They reject the legacy `max_tokens` parameter (and a custom `temperature`); the client previously always sent `max_tokens`, so the reviewer call 400'd and silently returned no issues. `callLLM` is now adaptive: it tries the standard params and, only on an unsupported-parameter/value error, falls forward to `max_completion_tokens` and drops `temperature`. The working shape is memoized per model. No model-name hardcoding, so OpenAI-compatible providers that expect `max_tokens` (Groq, DeepSeek, Ollama, etc.) are unaffected.
+- **Reasoning-model token headroom.** Reasoning models spend the completion budget on hidden reasoning before emitting text, so the small default budget produced empty, truncated responses. The reasoning shape now starts with a larger floor and auto-retries with a grown budget when a response comes back empty with `finish_reason: "length"`.
 
 ## 1.1.0
 

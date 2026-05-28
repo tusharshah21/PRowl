@@ -35726,7 +35726,7 @@ function isUnsupportedParamError(error) {
  */
 function callLLM(config, messages) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d, _e;
         const useCache = config.cache !== false;
         if (useCache) {
             const hit = (0, cache_1.cacheGet)(config, messages);
@@ -35740,30 +35740,46 @@ function callLLM(config, messages) {
             baseURL: config.baseURL || DEFAULT_BASE_URL,
         });
         const temperature = (_a = config.temperature) !== null && _a !== void 0 ? _a : 0.2;
-        const maxTokens = (_b = config.maxTokens) !== null && _b !== void 0 ? _b : 700;
+        const baseMaxTokens = (_b = config.maxTokens) !== null && _b !== void 0 ? _b : 700;
         // Start from the shape that previously worked for this model, then fall
         // forward through the remaining shapes on "unsupported parameter" errors.
         const start = SHAPE_ORDER.indexOf((_c = shapeMemo.get(config.model)) !== null && _c !== void 0 ? _c : "legacy");
         for (let i = Math.max(start, 0); i < SHAPE_ORDER.length; i++) {
             const shape = SHAPE_ORDER[i];
-            try {
-                const response = yield client.chat.completions.create(buildParams(shape, config.model, messages, maxTokens, temperature));
-                shapeMemo.set(config.model, shape);
-                const content = ((_f = (_e = (_d = response.choices[0]) === null || _d === void 0 ? void 0 : _d.message) === null || _e === void 0 ? void 0 : _e.content) === null || _f === void 0 ? void 0 : _f.trim()) || null;
-                if (useCache && content)
-                    (0, cache_1.cacheSet)(config, messages, content);
-                return content;
-            }
-            catch (error) {
-                if (isUnsupportedParamError(error) && i < SHAPE_ORDER.length - 1) {
-                    console.log(`[llm] '${shape}' params rejected by ${config.model}; retrying with '${SHAPE_ORDER[i + 1]}'`);
-                    continue;
+            // Reasoning models (the completion_only shape) spend tokens on hidden
+            // reasoning before any visible output, so a small budget yields an empty,
+            // truncated response. Give that shape real headroom up front.
+            let budget = shape === "completion_only" ? Math.max(baseMaxTokens, 4000) : baseMaxTokens;
+            let truncationRetries = 0;
+            while (true) {
+                try {
+                    const response = yield client.chat.completions.create(buildParams(shape, config.model, messages, budget, temperature));
+                    const choice = response.choices[0];
+                    const content = ((_e = (_d = choice === null || choice === void 0 ? void 0 : choice.message) === null || _d === void 0 ? void 0 : _d.content) === null || _e === void 0 ? void 0 : _e.trim()) || null;
+                    // Empty + truncated → the budget was consumed by reasoning. Grow it and retry.
+                    if (!content && (choice === null || choice === void 0 ? void 0 : choice.finish_reason) === "length" && truncationRetries < 2) {
+                        truncationRetries++;
+                        const grown = Math.min(budget * 3, 16000);
+                        console.log(`[llm] ${config.model} returned empty/truncated output at budget ${budget}; retrying at ${grown}`);
+                        budget = grown;
+                        continue;
+                    }
+                    shapeMemo.set(config.model, shape);
+                    if (useCache && content)
+                        (0, cache_1.cacheSet)(config, messages, content);
+                    return content;
                 }
-                console.error("LLM API Error:", error);
-                if (error instanceof Error) {
-                    console.error("Details:", error.message);
+                catch (error) {
+                    if (isUnsupportedParamError(error) && i < SHAPE_ORDER.length - 1) {
+                        console.log(`[llm] '${shape}' params rejected by ${config.model}; retrying with '${SHAPE_ORDER[i + 1]}'`);
+                        break; // advance to the next shape in the outer loop
+                    }
+                    console.error("LLM API Error:", error);
+                    if (error instanceof Error) {
+                        console.error("Details:", error.message);
+                    }
+                    return null;
                 }
-                return null;
             }
         }
         return null;
