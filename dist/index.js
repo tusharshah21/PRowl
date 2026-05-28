@@ -35702,8 +35702,14 @@ function isUnsupportedParamError(error) {
     const e = error;
     if (!e || e.status !== 400)
         return false;
-    return (e.code === "unsupported_parameter" ||
-        /unsupported parameter|not supported with this model|max_completion_tokens/i.test(e.message || ""));
+    // The next shape only helps if the 400 is about a param we actually vary.
+    if (["temperature", "max_tokens", "max_completion_tokens"].includes(e.param || "")) {
+        return true;
+    }
+    if (e.code === "unsupported_parameter" || e.code === "unsupported_value") {
+        return true;
+    }
+    return /unsupported (parameter|value)|not supported with this model|does not support|max_completion_tokens/i.test(e.message || "");
 }
 /**
  * Calls LLM using OpenAI-compatible API format.
