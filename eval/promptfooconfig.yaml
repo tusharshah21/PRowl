@@ -1,0 +1,67 @@
+# PRowl reviewer-agent quality evals.
+#
+# Each test feeds a known fixture diff through the real Agent 1 (reviewer) and
+# asserts the expected issue type is (or isn't) flagged. This guards against
+# silent regressions when prompts or models change.
+#
+# Run:  pnpm eval            (needs LLM_API_KEY; calls a live model)
+# Pin a model:  LLM_MODEL=gpt-4o-mini pnpm eval
+description: PRowl reviewer-agent quality evals
+
+providers:
+  - file://provider.js
+
+# The provider treats the rendered prompt as the raw unified diff.
+prompts:
+  - "{{diff}}"
+
+tests:
+  - description: SQL injection (string-concat into query) → SECURITY
+    vars:
+      diff: file://fixtures/sql_injection.diff
+    assert:
+      - type: javascript
+        value: |
+          const issues = typeof output === "string" ? JSON.parse(output) : output;
+          const hit = issues.some((i) => i.issueType === "SECURITY");
+          return hit
+            ? { pass: true, score: 1, reason: "SECURITY flagged" }
+            : { pass: false, score: 0, reason: "Expected SECURITY, got: " + JSON.stringify(issues) };
+
+  - description: Unguarded property access → BUG
+    vars:
+      diff: file://fixtures/null_deref.diff
+    assert:
+      - type: javascript
+        value: |
+          const issues = typeof output === "string" ? JSON.parse(output) : output;
+          const hit = issues.some((i) => i.issueType === "BUG");
+          return hit
+            ? { pass: true, score: 1, reason: "BUG flagged" }
+            : { pass: false, score: 0, reason: "Expected BUG, got: " + JSON.stringify(issues) };
+
+  - description: O(n^2) nested loop → PERFORMANCE
+    vars:
+      diff: file://fixtures/nested_loop.diff
+    assert:
+      - type: javascript
+        value: |
+          const issues = typeof output === "string" ? JSON.parse(output) : output;
+          const hit = issues.some((i) => i.issueType === "PERFORMANCE");
+          return hit
+            ? { pass: true, score: 1, reason: "PERFORMANCE flagged" }
+            : { pass: false, score: 0, reason: "Expected PERFORMANCE, got: " + JSON.stringify(issues) };
+
+  - description: Benign refactor → no SECURITY/BUG false positives
+    vars:
+      diff: file://fixtures/clean_change.diff
+    assert:
+      - type: javascript
+        value: |
+          const issues = typeof output === "string" ? JSON.parse(output) : output;
+          const noisy = issues.filter(
+            (i) => i.issueType === "SECURITY" || i.issueType === "BUG"
+          );
+          return noisy.length === 0
+            ? { pass: true, score: 1, reason: "no SECURITY/BUG false positives" }
+            : { pass: false, score: 0, reason: "False positive(s): " + JSON.stringify(noisy) };

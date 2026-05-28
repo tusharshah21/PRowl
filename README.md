@@ -258,6 +258,31 @@ If you set `SEMGREP_RULES` and have `semgrep` installed on the runner, PRowl wil
     SEMGREP_RULES: "p/security-audit,p/owasp-top-ten"
 ```
 
+## Evals (regression-testing review quality)
+
+Prompts and models drift. The `eval/` harness runs known-buggy fixture diffs
+through the real reviewer agent (Agent 1) and asserts the expected issue type is
+flagged — so a prompt tweak or model swap can't silently degrade review quality.
+
+```bash
+# 1. provide a key (calls a live model; no caching during evals)
+cp .env.example .env        # then edit .env and set LLM_API_KEY  (.env is gitignored)
+
+# 2. run (uses pnpm — this repo is pnpm-managed)
+pnpm eval
+```
+
+> Prefer not to use a file? Set it inline instead:
+> PowerShell `\$env:LLM_API_KEY="sk-..."; pnpm eval` · bash `LLM_API_KEY=sk-... pnpm eval`
+
+- Fixtures live in `eval/fixtures/*.diff` (SQL injection → SECURITY, unguarded
+  access → BUG, `O(n²)` loop → PERFORMANCE, plus a benign change that must
+  produce **no** false positives). Add your own `.diff` + a test block in
+  `eval/promptfooconfig.yaml`.
+- CI runs them **manually only** (`Reviewer Evals` workflow, `workflow_dispatch`)
+  so they never cost tokens on every PR or block merges. Set the `LLM_API_KEY`
+  repo secret and trigger from the Actions tab.
+
 ## Cost Comparison
 
 Example for reviewing 1000 lines (with TOON + caching):

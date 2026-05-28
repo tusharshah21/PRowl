@@ -1,0 +1,14 @@
+diff --git a/db/users.js b/db/users.js
+index 1111111..2222222 100644
+--- a/db/users.js
++++ b/db/users.js
+@@ -8,7 +8,8 @@ const db = require("./conn");
+
+ function getUser(req, res) {
+   const id = req.query.id;
+-  return db.query("SELECT * FROM users WHERE id = ?", [id]);
++  const sql = "SELECT * FROM users WHERE id = " + id;
++  return db.query(sql);
+ }
+
+ module.exports = { getUser };
